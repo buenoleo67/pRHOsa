@@ -1,0 +1,36 @@
+﻿@page "/expirado"
+@inject NavigationManager Navigation
+<div class="container mt-5">
+    <div class="card shadow-lg p-4 text-center border-danger">
+        <h2 class="text-danger mb-3">⏳ Sua demonstração expirou</h2>
+        <p class="lead">O período de 30 dias da versão gratuita foi finalizado.</p>
+        <p>Mas não se preocupe! Você pode continuar usando todos os recursos com a contratação definitiva.</p>
+
+        <hr class="my-4" />
+
+        <h4 class="text-success">Benefícios da Plataforma pRHosa:</h4>
+        <ul class="list-group list-group-flush text-start my-3">
+            <li class="list-group-item">✔️ Abertura e acompanhamento de necessidades do RH</li>
+            <li class="list-group-item">✔️ Tarefas automáticas e histórico completo</li>
+            <li class="list-group-item">✔️ Gestão por empresa com acesso seguro</li>
+            <li class="list-group-item">✔️ Visualizações modernas e responsivas</li>
+            <li class="list-group-item">✔️ Acesso para múltiplos perfis (RH, Diretoria, Colaborador)</li>
+        </ul>
+
+        <div class="mt-4">
+            <h5 class="text-primary">Valor de ativação: <strong>R$ 1.000,00</strong></h5>
+            <button class="btn btn-success btn-lg mt-3" @onclick="SolicitarContratacao">
+                Solicitar Contratação Definitiva
+            </button>
+        </div>
+    </div>
+</div>
+
+@code {
+    private void SolicitarContratacao()
+    {
+        // Você pode redirecionar para uma rota de contato ou apenas exibir uma mensagem
+        // Aqui simulamos envio para suporte
+        Navigation.NavigateTo("mailto:suporte@prhosa.com?subject=Contratação%20pRHosa&body=Olá, desejo contratar a versão completa da plataforma.");
+    }
+}

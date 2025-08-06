@@ -1,0 +1,119 @@
+﻿@page "/dashboard"
+@inject API ApiService
+
+<h3>Painel de Gestão</h3>
+@if (pieConfig == null || barConfig == null)
+{
+    <p>Carregando dados e gráficos...</p>
+}
+else
+{
+    <div class="dashboard-cards">
+        <div class="card">Total de Tarefas: @tarefasPorStatus.Sum(x => x.Total)</div>
+        <div class="card">Total de Necessidades: @necessidadesPorTipo.Sum(x => x.Total)</div>
+    </div>
+
+    <div class="charts">
+        <PieChart Config="@pieConfig" />
+        <BarChart Config="@barConfig" />
+    </div>
+}
+
+@code {
+    private List<TarefasPorStatusResponse> tarefasPorStatus = new();
+    private List<NecessidadesPorTipoResponse> necessidadesPorTipo = new();
+
+    private PieConfig pieConfig;
+    private BarConfig barConfig;
+    protected override async Task OnInitializedAsync()
+    {
+        // Inicializa os objetos de configuração antes de buscar os dados
+        pieConfig = new PieConfig
+            {
+                Options = new PieOptions
+                {
+                    Responsive = true,
+                    Title = new OptionsTitle { Display = true, Text = "Tarefas por Status" }
+                }
+            };
+
+        barConfig = new BarConfig
+            {
+                Options = new BarOptions
+                {
+                    Responsive = true,
+                    Title = new OptionsTitle { Display = true, Text = "Necessidades por Tipo" }
+                }
+            };
+
+        // Chamada de dados reais
+        tarefasPorStatus = await ApiService.GetTarefasPorStatus();
+
+        // Necessidades mockadas (trocaremos por endpoint real)
+        necessidadesPorTipo = new()
+    {
+        new NecessidadesPorTipoResponse { Tipo = "Admissão", Total = 5 },
+        new NecessidadesPorTipoResponse { Tipo = "Treinamento", Total = 3 },
+        new NecessidadesPorTipoResponse { Tipo = "Documentação", Total = 2 }
+    };
+
+        ConfigurarPizza();
+        ConfigurarBarra();
+    }
+
+
+    private void ConfigurarPizza()
+    {
+        pieConfig = new PieConfig
+        {
+            Options = new PieOptions
+            {
+                Responsive = true,
+                Title = new OptionsTitle { Display = true, Text = "Tarefas por Status" }
+            }
+        };
+
+        foreach (var item in tarefasPorStatus)
+            pieConfig.Data.Labels.Add(item.Status);
+
+        var dataset = new PieDataset<int>(tarefasPorStatus.Select(x => x.Total).ToList())
+        {
+            BackgroundColor = new IndexableOption<string>(
+                tarefasPorStatus.Select(_ => ColorUtil.RandomColorString()).ToArray()
+            )
+        };
+
+        pieConfig.Data.Datasets.Add(dataset);
+    }
+
+    private void ConfigurarBarra()
+    {
+        barConfig = new BarConfig
+        {
+            Options = new BarOptions
+            {
+                Responsive = true,
+                Title = new OptionsTitle { Display = true, Text = "Necessidades por Tipo" }
+            }
+        };
+
+        foreach (var item in necessidadesPorTipo)
+            barConfig.Data.Labels.Add(item.Tipo);
+
+        var dataset = new BarDataset<int>(necessidadesPorTipo.Select(x => x.Total).ToList())
+        {
+            Label = "Quantidade",
+            BackgroundColor = new IndexableOption<string>(
+                necessidadesPorTipo.Select(_ => ColorUtil.RandomColorString()).ToArray()
+            )
+        };
+
+        barConfig.Data.Datasets.Add(dataset);
+    }
+
+    public class NecessidadesPorTipoResponse
+    {
+        public string Tipo { get; set; } = "";
+        public int Total { get; set; }
+    }
+}

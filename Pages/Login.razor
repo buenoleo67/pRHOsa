@@ -1,0 +1,65 @@
+﻿@page "/login"
+@inject API ApiService
+@inject NavigationManager Navigation
+@inject Blazored.LocalStorage.ILocalStorageService LocalStorage
+<div class="login-page">
+    <div class="login-container">
+        <img src="images/logo.png" alt="Logo" class="login-logo" />
+        <h3>Login</h3>
+
+        @if (!string.IsNullOrEmpty(Message))
+        {
+            <div class="alert @alertClass">@Message</div>
+        }
+
+        <label>E-mail:</label>
+        <input type="email" class="form-control" @bind="Email" />
+
+        <label>Senha:</label>
+        <input type="password" class="form-control" @bind="Password" />
+
+        <button class="btn btn-primary" @onclick="FazerLogin">Entrar</button>
+
+        <p></p>
+        <p><a href="Register" class="forgot-password">Primeiro acesso?</a></p>
+        <p><a href="#" class="forgot-password">Esqueci minha senha</a></p>
+    </div>
+</div>
+
+@code {
+    private string Email { get; set; } = string.Empty;
+    private string Password { get; set; } = string.Empty;
+    private string? Message;
+    private string alertClass = "alert-success";
+
+    private async Task FazerLogin()
+    {
+        if (string.IsNullOrWhiteSpace(Email) || string.IsNullOrWhiteSpace(Password))
+        {
+            Message = "Preencha todos os campos!";
+            alertClass = "alert-danger";
+            return;
+        }
+
+        var resultado = await ApiService.PostLogin(Email, Password);
+
+        if (resultado == "success")
+        {
+            await LocalStorage.SetItemAsync("usuario_email", Email); // 🔹 Salva o e-mail no LocalStorage
+            Message = "Login realizado com sucesso!";
+            alertClass = "alert-success";
+            await Task.Delay(1000);
+            Navigation.NavigateTo("/home"); // 🔹 Redireciona após login
+        }
+        else if (resultado == "invalid_credentials")
+        {
+            Message = "E-mail ou senha inválidos!";
+            alertClass = "alert-danger";
+        }
+        else
+        {
+            Message = "Erro ao realizar login!";
+            alertClass = "alert-danger";
+        }
+    }
+}

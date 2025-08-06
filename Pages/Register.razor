@@ -1,0 +1,74 @@
+﻿@page "/register"
+@inject API ApiService
+@inject NavigationManager Navigation
+
+<div class="register-page">
+    <div class="register-container">
+        <img src="images/logo.png" alt="Logo" class="register-logo" />
+        <h3>Registro de Usuário</h3>
+
+        @if (!string.IsNullOrEmpty(Message))
+        {
+            <div class="alert @alertClass">@Message</div>
+        }
+
+        <label>E-mail:</label>
+        <input type="email" class="form-control" @bind="Email" />
+
+        <label>Senha:</label>
+        <input type="password" class="form-control" @bind="Password" />
+
+        <label>Confirmar Senha:</label>
+        <input type="password" class="form-control" @bind="ConfirmPassword" />
+
+        <button class="btn btn-primary mt-3" @onclick="RegistrarUsuario">Registrar</button>
+    </div>
+</div>
+
+
+@code {
+    private string Email { get; set; } = string.Empty;
+    private string Password { get; set; } = string.Empty;
+    private string ConfirmPassword { get; set; } = string.Empty;
+    private string? Message;
+    private string alertClass = "alert-success";
+
+    private async Task RegistrarUsuario()
+    {
+        if (string.IsNullOrWhiteSpace(Email) ||
+            string.IsNullOrWhiteSpace(Password) ||
+            string.IsNullOrWhiteSpace(ConfirmPassword))
+        {
+            Message = "Preencha todos os campos!";
+            alertClass = "alert-danger";
+            return;
+        }
+
+        if (Password != ConfirmPassword)
+        {
+            Message = "As senhas não coincidem!";
+            alertClass = "alert-danger";
+            return;
+        }
+
+        var resultado = await ApiService.PostUsuario(Email, Password);
+
+        if (resultado == "success")
+        {
+            Message = "Usuário registrado com sucesso!";
+            alertClass = "alert-success";
+            Navigation.NavigateTo("/login", true);
+            return;
+        }
+        else if (resultado.Contains("Este e-mail já está cadastrado"))
+        {
+            Message = resultado; // Exibe a mensagem retornada pela API
+            alertClass = "alert-warning";
+        }
+        else
+        {
+            Message = "Erro ao registrar usuário!";
+            alertClass = "alert-danger";
+        }
+    }
+}

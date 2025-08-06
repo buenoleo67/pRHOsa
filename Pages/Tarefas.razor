@@ -1,0 +1,389 @@
+﻿@page "/Tarefas"
+@inject API ApiService
+@inject Blazored.LocalStorage.ILocalStorageService LocalStorage
+@inject NavigationManager Navigation
+@using pRHosaApp1.Models
+<div class="page-container">
+<link href="css/necessidades.css" rel="stylesheet" />
+<h3 class="mb-4">📋 Minhas Tarefas</h3>
+
+@if (CarregandoTarefas)
+{
+    <div class="alert alert-info">Carregando tarefas...</div>
+}
+else if (ListaTarefas.Count == 0)
+{
+    <div class="alert alert-warning">Nenhuma tarefa encontrada.</div>
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <button class="btn btn-primary" @onclick="() => ExibirFormularioNovaTarefa = !ExibirFormularioNovaTarefa">
+        @(ExibirFormularioNovaTarefa ? "Fechar" : "+ Nova Tarefa")
+    </button>
+</div>
+
+@if (ExibirFormularioNovaTarefa)
+{
+    <div class="card p-3 mb-4 shadow-sm">
+        <h5 class="mb-3">Nova Tarefa</h5>
+
+        <div class="mb-2">
+            <label>Urgência:</label>
+            <select class="form-select" @bind="Tarefa.Necessidade">
+                <option value="1">Alta</option>
+                <option value="2">Moderada</option>
+                <option value="3">Baixa</option>
+            </select>
+        </div>
+
+        <div class="mb-2">
+            <label>Descrição:</label>
+            <textarea class="form-control" @bind="Tarefa.Descricao"></textarea>
+        </div>
+
+        <div class="mb-2">
+            <label>Responsável:</label>
+            <select class="form-select" @bind="Tarefa.UsuarioResponsavelId">
+                <option value="">-- Selecione um responsável --</option>
+                @foreach (var colab in Colaboradores)
+                {
+                    <option value="@colab.Id">@colab.Nome</option>
+                }
+            </select>
+        </div>
+
+        <button class="btn btn-success w-100" @onclick="CadastrarTarefa">Salvar Tarefa</button>
+    </div>
+}
+
+@if (!CarregandoTarefas && ListaTarefas.Count > 0)
+{
+    <div class="d-flex flex-wrap gap-3">
+        @foreach (var status in new[] { "Aberta", "Fechada", "Cancelada" })
+        {
+            <div class="kanban-column flex-fill">
+                <h5 class="text-center text-uppercase fw-bold">@status</h5>
+
+                @foreach (var tarefa in ListaTarefas.Where(t => t.Status == status))
+                {
+                    <div class="kanban-card p-3 mb-3 rounded shadow-sm border @ObterClasseCard(tarefa.Status) @(TarefaEstaAtrasada(tarefa) ? "kanban-atrasada" : "")">
+                        <div class="kanban-card-header mb-2" @onclick="() => SelecionarTarefa(tarefa)">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <strong>@tarefa.Descricao</strong>
+                                <span class="badge @ObterClasseStatus(tarefa.Status)">@tarefa.Status</span>
+                            </div>
+                            <div class="small text-muted">Necessidade: @FormatarNecessidade(tarefa.Necessidade)</div>
+                            <div class="small text-muted">Responsável: @ObterNomeResponsavel(tarefa.UsuarioResponsavelId)</div>
+                            <div class="small text-muted">Prazo: @tarefa.DataLimite.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</div>
+
+                            @if (tarefa.Status == "Aberta" || tarefa.Status == "Em Andamento")
+                            {
+                                if (TarefaEstaAtrasada(tarefa))
+                                {
+                                    <div class="text-danger fw-bold">⚠️ Prazo vencido!</div>
+                                }
+                                else
+                                {
+                                    var restante = tarefa.DataLimite.ToLocalTime() - DateTime.Now;
+                                    <div class="text-muted">⏳ @restante.Hours h @restante.Minutes min restantes</div>
+                                }
+                            }
+                        </div>
+
+                        @if (TarefaSelecionada?.TarefaId == tarefa.TarefaId)
+                        {
+                            <div class="tarefa-detalhes mt-3">
+                                <hr />
+                                @if ((Colaborador?.TipoUsuario == 1 || Colaborador?.TipoUsuario == 4) && (tarefa.Status != "Fechada" && tarefa.Status != "Cancelada"))
+                                {
+                                    <div class="mb-2">
+                                        <label><strong>Alterar Responsável:</strong></label>
+                                        <select class="form-select" @onchange="(e) => OnChangeResponsavel(e, tarefa.TarefaId)">
+                                            <option value="">-- Selecione --</option>
+                                            @foreach (var colab in Colaboradores)
+                                            {
+                                                <option value="@colab.Id" selected="@(TarefaSelecionada?.UsuarioResponsavelId == colab.Id)">
+                                                    @colab.Nome
+                                                </option>
+                                            }
+                                        </select>
+                                    </div>
+                                }
+                                else if (tarefa.Status == "Fechada" || tarefa.Status == "Cancelada")
+                                {
+                                    <div class="alert alert-secondary small">
+                                        Edição desativada: tarefa <b>@tarefa.Status.ToUpper()</b>.
+                                    </div>
+                                }
+                                else
+                                {
+                                    <div class="form-control bg-light text-muted">@ObterNomeResponsavel(tarefa.UsuarioResponsavelId)</div>
+                                }
+
+
+                                <p class="mb-1"><strong>Data de Abertura:</strong> @tarefa.DataCriacao.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</p>
+
+                                @if (tarefa.Status != "Fechada" && tarefa.Status != "Cancelada")
+                                {
+                                    <div class="mb-2">
+                                        <label>Adicionar Comentário:</label>
+                                        <textarea class="form-control" @bind="NovoComentario"></textarea>
+                                        <button class="btn btn-outline-primary btn-sm mt-2" @onclick="AdicionarComentario">Salvar Comentário</button>
+                                    </div>
+                                }
+
+                                <div class="mt-3">
+                                    <h6>📌 Histórico de Comentários:</h6>
+                                    @if (Comentarios.Count == 0)
+                                    {
+                                        <p class="text-muted">Nenhum comentário ainda.</p>
+                                    }
+                                    else
+                                    {
+                                        <ul class="list-group">
+                                            @foreach (var c in Comentarios)
+                                            {
+                                                <li class="list-group-item">
+                                                    <b>@c.AutorNome:</b> @c.Texto
+                                                    <small class="text-muted">(@c.Data.ToLocalTime().ToString("dd/MM/yyyy HH:mm"))</small>
+                                                </li>
+                                            }
+                                        </ul>
+                                    }
+
+                                    @if (tarefa.Status != "Fechada" && tarefa.Status != "Cancelada")
+                                    {
+                                        <div class="mt-3">
+                                            <button class="btn btn-outline-danger me-2" @onclick='() => AbrirEncerramento("Cancelada")'>❌ Cancelar</button>
+                                            <button class="btn btn-outline-success" @onclick='() => AbrirEncerramento("Fechada")'>✅ Finalizar</button>
+                                        </div>
+                                    }
+
+                                    @if (ExibirEncerramento)
+                                    {
+                                        <div class="card p-3 mt-3 bg-light">
+                                            <h6>Comentário de encerramento (obrigatório):</h6>
+                                            <textarea class="form-control" @bind="ComentarioEncerramento"></textarea>
+                                            <div class="mt-2 d-flex gap-2">
+                                                <button class="btn btn-primary" @onclick="ConfirmarEncerramento">Salvar</button>
+                                                <button class="btn btn-secondary" @onclick="() => ExibirEncerramento = false">Cancelar</button>
+                                            </div>
+                                        </div>
+                                    }
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+        }
+    </div>
+}
+
+<button class="btn btn-outline-secondary mt-4" @onclick="VoltarParaHome">← Voltar</button>
+</div>
+@code {
+    private bool CarregandoTarefas = true;
+    private bool ExibirFormularioNovaTarefa = false;
+    private bool ExibirEncerramento = false;
+    private string ComentarioEncerramento = "";
+    private string? NovoStatusEncerramento = null;
+    private string? UsuarioEmail;
+    private string Message = "";
+    private string alertClass = "";
+    private List<ColaboradorInfo> Colaboradores = new();
+    private TarefaRequest Tarefa = new();
+    private List<TarefaResponse> ListaTarefas = new();
+    private TarefaResponse? TarefaSelecionada;
+    private List<Comentario> Comentarios = new();
+    private string NovoComentario = "";
+    private ColaboradorResponse? Colaborador;
+    protected override async Task OnInitializedAsync()
+    {
+        UsuarioEmail = await LocalStorage.GetItemAsync<string>("usuario_email");
+
+        if (string.IsNullOrEmpty(UsuarioEmail))
+        {
+            Navigation.NavigateTo("/login", true);
+            return;
+        }
+
+        Colaborador = await ApiService.GetColaboradorInfo(UsuarioEmail);
+
+        var empresas = await ApiService.GetEmpresasAsync(UsuarioEmail) ?? new();
+        var minhaEmpresa = empresas.FirstOrDefault();
+
+        if (minhaEmpresa?.DataInicioDemo != null)
+        {
+            var dias = (DateTime.UtcNow - minhaEmpresa.DataInicioDemo.Value).TotalDays;
+
+            if (dias > 30)
+            {
+                Navigation.NavigateTo("/expirado", true);
+                return;
+            }
+        }
+
+        Colaboradores = await ApiService.GetColaboradoresAsync(minhaEmpresa.EmpresaId) ?? new();
+        await CarregarTarefas();
+    }
+
+
+    private async Task CarregarTarefas()
+    {
+        CarregandoTarefas = true;
+        ListaTarefas = await ApiService.GetTarefasUsuario(UsuarioEmail) ?? new();
+        CarregandoTarefas = false;
+    }
+
+    private async Task CadastrarTarefa()
+    {
+        Tarefa.DataCriacao = DateTime.UtcNow;
+        Tarefa.DataLimite = Tarefa.Necessidade switch
+        {
+            1 => Tarefa.DataCriacao.AddDays(1),
+            2 => Tarefa.DataCriacao.AddHours(12),
+            3 => Tarefa.DataCriacao.AddHours(6),
+            _ => Tarefa.DataCriacao.AddDays(1)
+        };
+
+        var resultado = await ApiService.PostTarefa(UsuarioEmail, Tarefa);
+
+        if (resultado == "success")
+        {
+            Message = "Tarefa cadastrada com sucesso!";
+            alertClass = "alert-success";
+            Tarefa = new();
+            await CarregarTarefas();
+        }
+        else
+        {
+            Message = $"Erro: {resultado}";
+            alertClass = "alert-danger";
+        }
+    }
+
+    private async Task SelecionarTarefa(TarefaResponse tarefa)
+    {
+        if (TarefaSelecionada?.TarefaId == tarefa.TarefaId)
+        {
+            TarefaSelecionada = null;
+            Comentarios.Clear();
+        }
+        else
+        {
+            TarefaSelecionada = tarefa;
+            Comentarios = await ApiService.GetComentariosPorTarefa(tarefa.TarefaId) ?? new();
+        }
+    }
+
+    private async Task AdicionarComentario()
+    {
+        if (TarefaSelecionada == null || string.IsNullOrWhiteSpace(NovoComentario)) return;
+
+        var comentario = new Comentario
+            {
+                Autor = UsuarioEmail!,
+                Texto = NovoComentario,
+                Data = DateTime.UtcNow
+            };
+
+        var sucesso = await ApiService.AdicionarComentarioAsync(TarefaSelecionada.TarefaId, comentario);
+
+        if (sucesso)
+        {
+            Comentarios.Add(comentario);
+            NovoComentario = "";
+        }
+    }
+
+    private string FormatarNecessidade(int n) => n switch
+    {
+        1 => "Alta",
+        2 => "Moderada",
+        3 => "Baixa",
+        _ => "Desconhecida"
+    };
+        
+    private void VoltarParaHome() => Navigation.NavigateTo("/home");
+
+    private string ObterNomeResponsavel(int? id)
+    {
+        if (!id.HasValue)
+            return "Não atribuído";
+
+        var colaborador = Colaboradores.FirstOrDefault(c => c.Id == id.Value);
+        return colaborador != null ? colaborador.Nome : "Responsável desconhecido";
+    }
+
+
+    private void AbrirEncerramento(string status)
+    {
+        NovoStatusEncerramento = status;
+        ExibirEncerramento = true;
+    }
+
+    private async Task ConfirmarEncerramento()
+    {
+        if (string.IsNullOrWhiteSpace(ComentarioEncerramento) || TarefaSelecionada == null) return;
+
+        var sucessoStatus = await ApiService.AtualizarStatusTarefaAsync(TarefaSelecionada.TarefaId, NovoStatusEncerramento!);
+
+        var comentario = new Comentario
+            {
+                Autor = UsuarioEmail!,
+                Texto = $"[Encerramento - {NovoStatusEncerramento}] {ComentarioEncerramento}",
+                Data = DateTime.UtcNow
+            };
+
+        var sucessoComentario = await ApiService.AdicionarComentarioAsync(TarefaSelecionada.TarefaId, comentario);
+
+        if (sucessoStatus && sucessoComentario)
+        {
+            TarefaSelecionada.Status = NovoStatusEncerramento!;
+            Comentarios.Add(comentario);
+            ComentarioEncerramento = "";
+            ExibirEncerramento = false;
+            await CarregarTarefas();
+        }
+    }
+
+    private async Task OnChangeResponsavel(ChangeEventArgs e, int tarefaId)
+    {
+        if (!int.TryParse(e.Value?.ToString(), out int novoResponsavelId)) return;
+
+        var sucesso = await ApiService.AtualizarResponsavelTarefaAsync(tarefaId, novoResponsavelId);
+
+        if (sucesso)
+        {
+            var tarefa = ListaTarefas.FirstOrDefault(t => t.TarefaId == tarefaId);
+            if (tarefa != null) tarefa.UsuarioResponsavelId = novoResponsavelId;
+            if (TarefaSelecionada?.TarefaId == tarefaId) TarefaSelecionada.UsuarioResponsavelId = novoResponsavelId;
+            StateHasChanged();
+        }
+        else
+        {
+            Message = "Erro ao atualizar responsável.";
+            alertClass = "alert-danger";
+        }
+    }
+
+    private string ObterClasseStatus(string status) =>
+        status switch
+        {
+            "Cancelada" => "status-cancelada",
+            "Fechada" => "status-fechada",
+            _ => "bg-info text-white"
+        };
+
+    private string ObterClasseCard(string status) =>
+        status switch
+        {
+            "Cancelada" => "status-card-cancelada",
+            "Fechada" => "status-card-fechada",
+            _ => "bg-light border-info"
+        };
+
+    private bool TarefaEstaAtrasada(TarefaResponse tarefa) =>
+        (tarefa.Status == "Aberta" || tarefa.Status == "Em Andamento") && DateTime.Now > tarefa.DataLimite.ToLocalTime();
+}
