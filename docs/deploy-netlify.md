@@ -21,10 +21,12 @@ Com isso, todo push em `main` passa a publicar automaticamente no Netlify.
 
 O projeto ja esta preparado com `netlify.toml`.
 
-- Build command: `dotnet publish pRHosaApp1.csproj -c Release`
+- Build command: `bash ./tools/netlify-build.sh`
 - Publish directory: `bin/Release/net9.0/publish/wwwroot`
 
 Tambem foi adicionada a regra SPA em `wwwroot/_redirects`, para evitar erro `404` ao abrir rotas como `/login`, `/home`, `/Necessidades` e similares.
+
+Como o ambiente padrao do Netlify iniciou o build com .NET 8, deixamos um script dedicado que instala o SDK .NET 9 antes do `publish`.
 
 Observacao importante:
 

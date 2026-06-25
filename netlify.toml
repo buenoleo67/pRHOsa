@@ -1,5 +1,5 @@
 [build]
-command = "dotnet publish pRHosaApp1.csproj -c Release"
+command = "bash ./tools/netlify-build.sh"
 publish = "bin/Release/net9.0/publish/wwwroot"
 
 [build.environment]
