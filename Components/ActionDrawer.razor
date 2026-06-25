@@ -1,0 +1,34 @@
+@if (IsOpen)
+{
+    <div class="action-drawer">
+        <button type="button" class="action-drawer__overlay" aria-label="Fechar painel" @onclick="OnClose"></button>
+
+        <aside class="action-drawer__panel" role="dialog" aria-modal="true" aria-label="@Title">
+            <div class="action-drawer__header">
+                <div>
+                    <span class="action-drawer__eyebrow">Ferramenta</span>
+                    <h2>@Title</h2>
+
+                    @if (!string.IsNullOrWhiteSpace(Subtitle))
+                    {
+                        <p>@Subtitle</p>
+                    }
+                </div>
+
+                <button type="button" class="action-drawer__close" aria-label="Fechar painel" @onclick="OnClose">X</button>
+            </div>
+
+            <div class="action-drawer__body">
+                @ChildContent
+            </div>
+        </aside>
+    </div>
+}
+
+@code {
+    [Parameter] public bool IsOpen { get; set; }
+    [Parameter] public string Title { get; set; } = string.Empty;
+    [Parameter] public string? Subtitle { get; set; }
+    [Parameter] public EventCallback OnClose { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

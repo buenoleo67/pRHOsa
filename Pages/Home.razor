@@ -1,45 +1,11 @@
-﻿@page "/home"
-@using pRHosaApp1.Models
+@page "/home"
 @inject API ApiService
-@inject Blazored.LocalStorage.ILocalStorageService LocalStorage
+@inject SessionService SessionService
 @inject NavigationManager Navigation
+@inject NotificationService NotificationService
 
-<div class="layout">
-    <div class="sidebar @(SidebarAberta ? "open" : "")">
-        <div class="sidebar-header">
-            <h2>pRHosa</h2>
-            <button class="btn-menu @(SidebarAberta ? "open" : "")" @onclick="ToggleSidebar">
-                <span></span>
-                <span></span>
-                <span></span>
-            </button>
-
-        </div>
-        <nav>
-            <a @onclick="IrParaDashboard">🏠 Dashboard</a>
-            <a @onclick="IrParaNecessidades">📑 Necessidades</a>
-            <a @onclick="IrParaTarefas">✅ Tarefas</a>
-
-            <div class="admin-section">
-                <strong>⚙️ Administração</strong>
-                <a @onclick="ToggleFormulario">👥 Colaboradores</a>
-                <a @onclick="ToggleFormularioCargo">💼 Cargos</a>
-                <a @onclick="ToggleFormularioTipo">📝 Tipos de Necessidade</a>
-                <a @onclick="IrParaEmpresas">🏢 Empresas</a>
-            </div>
-
-            <a @onclick="Logout">🚪 Sair</a>
-        </nav>
-    </div>
-
-    <!-- Topbar -->
-    <div class="topbar">
-        <button class="btn-menu" @onclick="ToggleSidebar">☰</button>
-        <h1 class="topbar-title">Home</h1>
-    </div>
-
-    <!-- Conteúdo -->
-    <div class="content">
+<AuthGuard>
+    <AppShell Title="Visao geral" Subtitle="Centralize cadastros, acompanhe a conta e organize a base da operacao antes de escalar o time.">
         @if (Carregando)
         {
             <div class="loading-progress"></div>
@@ -48,239 +14,919 @@
         {
             <div class="alert alert-danger">@MensagemErro</div>
         }
-        else if (Usuario != null)
+        else if (Usuario is not null)
         {
-            <div class="card">
-                <h3>👋 Bem-vindo, @Usuario.Email!</h3>
-                <p><strong>ID:</strong> @Usuario.Id</p>
-                <p><strong>Data de Cadastro:</strong> @(Usuario.DataCadastro.ToString("dd/MM/yyyy HH:mm"))</p>
-            </div>
-
-            @if (Colaborador != null)
-            {
-                <div class="card">
-                    <h4>Informações do Colaborador</h4>
-                    <p><strong>Nome:</strong> @Colaborador.Nome</p>
-                    <p><strong>Cargo:</strong> @Colaborador.Cargo</p>
-                    <p><strong>Tipo:</strong> @TipoUsuarioDescricao(Colaborador.TipoUsuario)</p>
+            <section class="home-hero card">
+                <div>
+                    <span class="home-pill">Conta ativa</span>
+                    <h2>Bem-vindo, @NomeApresentacao.</h2>
+                    <p class="text-muted">
+                        Seu espaco de operacao esta pronto para administrar acessos, colaboradores, tipos de necessidade, cargos e empresas com mais clareza.
+                    </p>
                 </div>
-            }
-            else
-            {
-                <div class="card bg-light">
-                    <h4>🎁 Ativar Demonstração Gratuita</h4>
-                    <p>Preencha o nome da empresa para ativar 30 dias gratuitos.</p>
-                    <input class="form-control" @bind="NomeEmpresaDemo" placeholder="Nome da Empresa" />
-                    <button class="btn btn-success mt-2" @onclick="AtivarPlanoDemo">🚀 Ativar</button>
-                    @if (!string.IsNullOrEmpty(Message))
+
+                <div class="home-metric-grid">
+                    <article class="home-metric">
+                        <span>Perfil</span>
+                        <strong>@PerfilUsuario</strong>
+                        <small>Controle principal da conta</small>
+                    </article>
+                    <article class="home-metric">
+                        <span>Usuarios</span>
+                        <strong>@UsuariosGestao.Count</strong>
+                        <small>Acessos ao sistema</small>
+                    </article>
+                    <article class="home-metric">
+                        <span>Colaboradores</span>
+                        <strong>@Colaboradores.Count</strong>
+                        <small>Perfis e cargos do time</small>
+                    </article>
+                    <article class="home-metric">
+                        <span>Empresas</span>
+                        <strong>@Empresas.Count</strong>
+                        <small>@StatusDemo</small>
+                    </article>
+                </div>
+            </section>
+
+            <section class="home-grid">
+                <article class="card">
+                    <h3>Conta e contexto</h3>
+                    <div class="home-info-list">
+                        <div>
+                            <span>E-mail</span>
+                            <strong>@Usuario.Email</strong>
+                        </div>
+                        <div>
+                            <span>Cadastro</span>
+                            <strong>@TextoDataCadastro</strong>
+                        </div>
+                        <div>
+                            <span>Empresa principal</span>
+                            <strong>@(EmpresaPrincipal?.Nome ?? "Ainda nao cadastrada")</strong>
+                        </div>
+                        <div>
+                            <span>Status da demo</span>
+                            <strong>@StatusDemo</strong>
+                        </div>
+                    </div>
+                </article>
+
+                <article class="card">
+                    @if (Colaborador is not null)
                     {
-                        <div class="alert @alertClass">@Message</div>
+                        <h3>Perfil do colaborador</h3>
+                        <div class="home-info-list">
+                            <div>
+                                <span>Nome</span>
+                                <strong>@Colaborador.Nome</strong>
+                            </div>
+                            <div>
+                                <span>Cargo</span>
+                                <strong>@Colaborador.Cargo</strong>
+                            </div>
+                            <div>
+                                <span>Tipo</span>
+                                <strong>@TipoUsuarioDescricao(Colaborador.TipoUsuario)</strong>
+                            </div>
+                            <div>
+                                <span>Empresa</span>
+                                <strong>@(EmpresaPrincipal?.Nome ?? "Nao vinculada")</strong>
+                            </div>
+                        </div>
                     }
-                </div>
+                    else
+                    {
+                        <h3>Ative sua demonstracao</h3>
+                        <p class="text-muted">Crie uma empresa de teste para liberar os primeiros 30 dias e concluir o bootstrap do ambiente.</p>
+
+                        <input class="form-control" @bind="NomeEmpresaDemo" placeholder="Nome da empresa demo" />
+                        <button class="btn btn-success mt-3" @onclick="AtivarPlanoDemo">Ativar demonstracao</button>
+
+                        @if (!string.IsNullOrEmpty(Message))
+                        {
+                            <div class="alert @alertClass mt-3">@Message</div>
+                        }
+                    }
+                </article>
+            </section>
+
+            <section class="home-action-bar">
+                <button type="button" class="btn btn-outline-primary" @onclick="AbrirFormularioUsuario">Novo usuario</button>
+                <button type="button" class="btn btn-outline-primary" @onclick="AbrirFormularioColaborador">Novo colaborador</button>
+                <button type="button" class="btn btn-outline-primary" @onclick="AbrirFormularioCargo">Novo cargo</button>
+                <button type="button" class="btn btn-outline-primary" @onclick="AbrirFormularioTipo">Novo tipo</button>
+                <button type="button" class="btn btn-info" @onclick="IrParaEmpresas">Empresas</button>
+            </section>
+
+            @if (ResumoOperacao is not null)
+            {
+                <section class="home-grid">
+                    <article class="card">
+                        <div class="home-section-header">
+                            <div>
+                                <h3>Mesa operacional</h3>
+                                <p class="text-muted">Uma leitura rapida da fila para o RH agir antes do backlog crescer.</p>
+                            </div>
+                        </div>
+
+                        <div class="home-metric-grid home-metric-grid--operacao">
+                            <article class="home-metric">
+                                <span>Necessidades abertas</span>
+                                <strong>@ResumoOperacao.TotalNecessidadesAbertas</strong>
+                                <small>@ResumoOperacao.TotalNecessidadesCriticas criticas</small>
+                            </article>
+                            <article class="home-metric">
+                                <span>Tarefas pendentes</span>
+                                <strong>@ResumoOperacao.TotalTarefasPendentes</strong>
+                                <small>@ResumoOperacao.TotalTarefasAtrasadas atrasadas</small>
+                            </article>
+                            <article class="home-metric">
+                                <span>Sem responsavel</span>
+                                <strong>@ResumoOperacao.TotalTarefasSemResponsavel</strong>
+                                <small>Itens sem dono claro</small>
+                            </article>
+                            <article class="home-metric">
+                                <span>Conclusao</span>
+                                <strong>@ResumoOperacao.PercentualConclusaoTarefas.ToString("0.#")%</strong>
+                                <small>Taxa de fechamento das tarefas</small>
+                            </article>
+                        </div>
+                    </article>
+
+                    <article class="card">
+                        <div class="home-section-header">
+                            <div>
+                                <h3>Filas prioritarias</h3>
+                                <p class="text-muted">Visibilidade de queue management para orientar a proxima acao.</p>
+                            </div>
+                        </div>
+
+                        @if (ResumoOperacao.FilasNecessidades.Any())
+                        {
+                            <div class="home-list">
+                                @foreach (var fila in ResumoOperacao.FilasNecessidades)
+                                {
+                                    <article class="home-list__item">
+                                        <div>
+                                            <strong>@fila.Label</strong>
+                                            <p>@fila.Meta</p>
+                                        </div>
+                                        <div class="home-status-badge">@fila.Total</div>
+                                    </article>
+                                }
+                            </div>
+                        }
+                    </article>
+                </section>
             }
 
-            @if (ExibirFormulario)
-            {
-                <div class="card">
-                    <h4>Cadastro de Colaborador</h4>
+            <section class="home-grid home-grid--stack">
+                <article class="card">
+                    <div class="home-section-header">
+                        <div>
+                            <h3>Gestao de usuarios</h3>
+                            <p class="text-muted">Controle os acessos e veja quais usuarios ja estao vinculados a um colaborador.</p>
+                        </div>
+                    </div>
 
-                    <label>Nome:</label>
-                    <input class="form-control mb-2" @bind="ColaboradorForm.Nome" />
+                    @if (UsuariosGestao.Any())
+                    {
+                        <div class="home-list">
+                            @foreach (var usuarioGestao in UsuariosGestao)
+                            {
+                                <article class="home-list__item">
+                                    <div>
+                                        <strong>@usuarioGestao.Email</strong>
+                                        <p>
+                                            @(string.IsNullOrWhiteSpace(usuarioGestao.ColaboradorNome)
+                                                ? "Sem colaborador vinculado"
+                                                : $"{usuarioGestao.ColaboradorNome} • {TipoUsuarioDescricao(usuarioGestao.TipoUsuario)}")
+                                        </p>
+                                    </div>
+                                    <div class="home-list__actions">
+                                        @if (usuarioGestao.ColaboradorId.HasValue || !string.IsNullOrWhiteSpace(usuarioGestao.ColaboradorNome))
+                                        {
+                                            <button type="button" class="btn btn-sm btn-outline-primary home-action-button" @onclick="() => AbrirEdicaoVinculo(usuarioGestao)">Editar cadastro</button>
+                                        }
+                                        else
+                                        {
+                                            <button type="button" class="btn btn-sm btn-outline-primary home-action-button" @onclick="() => VincularUsuario(usuarioGestao)">Vincular colaborador</button>
+                                        }
 
-                    <label>CPF:</label>
-                    <input class="form-control mb-2" @bind="ColaboradorForm.CPF" />
+                                        <div class="home-status-badge">
+                                            @usuarioGestao.DataCadastro.ToLocalTime().ToString("dd/MM/yyyy")
+                                        </div>
+                                    </div>
+                                </article>
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <p class="text-muted">Nenhum usuario cadastrado ainda.</p>
+                    }
+                </article>
 
-                    <label>Email:</label>
-                    <input type="email" class="form-control mb-2" @bind="ColaboradorForm.Email" />
+                <article class="card">
+                    <div class="home-section-header">
+                        <div>
+                            <h3>Colaboradores e tipos</h3>
+                            <p class="text-muted">A logica operacional do app depende do tipo do colaborador. Aqui voce acompanha os perfis ativos na empresa.</p>
+                        </div>
+                    </div>
 
-                    <label>Tipo de Usuário:</label>
-                    <select class="form-select mb-2" @bind="ColaboradorForm.TipoUsuario">
-                        <option value="1">Usuário RH</option>
-                        <option value="2">Usuário Apoio</option>
-                        <option value="3">Usuário Colaborador</option>
-                        <option value="4">Usuário Diretoria</option>
-                    </select>
+                    @if (Colaboradores.Any())
+                    {
+                        <div class="home-list">
+                            @foreach (var colaboradorInfo in Colaboradores.OrderBy(c => c.Nome))
+                            {
+                                <article class="home-list__item">
+                                    <div>
+                                        <strong>@colaboradorInfo.Nome</strong>
+                                        <p>@TipoUsuarioDescricao(colaboradorInfo.TipoUsuario) • @colaboradorInfo.Cargo</p>
+                                        <small class="text-muted">CPF @FormatarCpf(colaboradorInfo.CPF)</small>
+                                    </div>
+                                    <div class="home-list__actions">
+                                        @if (ExisteUsuarioGestao(colaboradorInfo.Email))
+                                        {
+                                            <button type="button" class="btn btn-sm btn-outline-primary home-action-button" @onclick="() => AbrirEdicaoVinculo(colaboradorInfo.Email)">Editar cadastro</button>
+                                        }
+                                        else
+                                        {
+                                            <button type="button" class="btn btn-sm btn-outline-secondary home-action-button" @onclick="() => AbrirCadastroUsuarioParaColaborador(colaboradorInfo)">Criar acesso</button>
+                                        }
+                                        <div class="home-status-badge">
+                                            @colaboradorInfo.Email
+                                        </div>
+                                    </div>
+                                </article>
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <p class="text-muted">Nenhum colaborador carregado para a empresa atual.</p>
+                    }
+                </article>
+            </section>
 
-                    <label>Empresa:</label>
-                    <select class="form-select mb-2" @bind="ColaboradorForm.EmpresaId">
-                        @foreach (var empresa in Empresas)
-                        {
-                            <option value="@empresa.EmpresaId">@empresa.Nome</option>
-                        }
-                    </select>
+            <ActionDrawer IsOpen="ExibirFormularioUsuario"
+                          Title="Novo usuario de acesso"
+                          Subtitle="@(ColaboradorAcessoSelecionado is null
+                              ? "Crie o acesso e depois vincule esse e-mail ao colaborador com o perfil correto."
+                              : "Crie o acesso diretamente para o colaborador selecionado, mantendo e-mail e CPF alinhados ao cadastro.")"
+                          OnClose="FecharFormularios">
+                @if (ColaboradorAcessoSelecionado is not null)
+                {
+                    <div class="home-edit-context">
+                        <span class="home-edit-context__label">Acesso para colaborador</span>
+                        <strong>@ColaboradorAcessoSelecionado.Nome</strong>
+                        <small>@ColaboradorAcessoSelecionado.Email • CPF @FormatarCpf(NovoUsuarioCpf)</small>
+                    </div>
+                }
 
-                    <label>Cargo:</label>
-                    <div class="d-flex gap-2 mb-2">
-                        <select class="form-select" @bind="ColaboradorForm.Cargo">
+                <div class="home-drawer-grid">
+                    <div>
+                        <label>E-mail</label>
+                        <input type="email" class="form-control mb-2" @bind="NovoUsuarioEmail" />
+                    </div>
+                    @if (ColaboradorAcessoSelecionado is not null)
+                    {
+                        <div>
+                            <label>CPF</label>
+                            <input class="form-control mb-2" @bind="NovoUsuarioCpf" disabled />
+                        </div>
+                    }
+                    <div>
+                        <label>Senha</label>
+                        <input type="password" class="form-control mb-2" @bind="NovaUsuarioSenha" />
+                    </div>
+                    <div>
+                        <label>Confirmar senha</label>
+                        <input type="password" class="form-control mb-2" @bind="ConfirmacaoUsuarioSenha" />
+                    </div>
+                </div>
+
+                <div class="home-drawer-actions">
+                    <button class="btn btn-success" @onclick="CadastrarUsuario">Salvar usuario</button>
+                </div>
+
+                @if (!string.IsNullOrEmpty(MessageUsuario))
+                {
+                    <div class="alert @(UsuarioSalvoComSucesso ? "alert-success" : "alert-danger") mt-3">@MessageUsuario</div>
+                }
+            </ActionDrawer>
+
+            <ActionDrawer IsOpen="ExibirFormulario"
+                          Title="Cadastro de colaborador"
+                          Subtitle="Monte a base do time com empresa, cargo e tipo de acesso alinhados a regra do app."
+                          OnClose="FecharFormularios">
+                <div class="home-drawer-grid">
+                    <div>
+                        <label>Nome</label>
+                        <input class="form-control mb-2" @bind="ColaboradorForm.Nome" />
+                    </div>
+                    <div>
+                        <label>CPF</label>
+                        <input class="form-control mb-2" @bind="ColaboradorForm.CPF" />
+                    </div>
+                    <div>
+                        <label>E-mail</label>
+                        <input type="email" class="form-control mb-2" @bind="ColaboradorForm.Email" />
+                    </div>
+                    <div>
+                        <label>Tipo de usuario</label>
+                        <select class="form-select mb-2" @bind="ColaboradorForm.TipoUsuario">
+                            <option value="1">Usuario RH</option>
+                            <option value="2">Usuario Apoio</option>
+                            <option value="3">Usuario Colaborador</option>
+                            <option value="4">Usuario Diretoria</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label>Empresa</label>
+                        <select class="form-select mb-2" @bind="ColaboradorForm.EmpresaId">
+                            @foreach (var empresa in Empresas)
+                            {
+                                <option value="@empresa.EmpresaId">@empresa.Nome</option>
+                            }
+                        </select>
+                    </div>
+                    <div>
+                        <label>Cargo</label>
+                        <div class="home-inline-input">
+                            <select class="form-select" @bind="ColaboradorForm.Cargo">
+                                <option value="">-- Selecione --</option>
+                                @foreach (var cargo in Cargos)
+                                {
+                                    <option value="@cargo.Nome">@cargo.Nome</option>
+                                }
+                            </select>
+                            <button class="btn btn-outline-primary" type="button" @onclick="ToggleNovoCargo">Novo cargo</button>
+                        </div>
+                    </div>
+                    <div>
+                        <label>Data de nascimento</label>
+                        <InputDate @bind-Value="ColaboradorForm.DataNascimento" class="form-control mb-2" />
+                    </div>
+                    <div>
+                        <label>Data de admissao</label>
+                        <InputDate @bind-Value="ColaboradorForm.DataAdmissao" class="form-control mb-2" />
+                    </div>
+                    <div>
+                        <label>Endereco</label>
+                        <input class="form-control mb-2" @bind="ColaboradorForm.Endereco" />
+                    </div>
+                    <div>
+                        <label>Genero</label>
+                        <select class="form-select mb-3" @bind="ColaboradorForm.Genero">
+                            <option value="">-- Selecione --</option>
+                            <option value="Masculino">Masculino</option>
+                            <option value="Feminino">Feminino</option>
+                            <option value="Outros">Outros</option>
+                        </select>
+                    </div>
+                </div>
+
+                @if (ExibirNovoCargo)
+                {
+                    <div class="home-inline-panel">
+                        <input class="form-control" @bind="NovoCargo.Nome" placeholder="Nome do novo cargo" />
+                        <button class="btn btn-success" @onclick="CadastrarNovoCargo">Salvar cargo</button>
+                    </div>
+
+                    @if (!string.IsNullOrEmpty(MessageCargoInline))
+                    {
+                        <div class="alert alert-info mt-2">@MessageCargoInline</div>
+                    }
+                }
+
+                <div class="home-drawer-actions">
+                    <button class="btn btn-success" @onclick="CadastrarColaborador">Salvar colaborador</button>
+                </div>
+
+                @if (!string.IsNullOrEmpty(Message))
+                {
+                    <div class="alert @alertClass mt-3">@Message</div>
+                }
+            </ActionDrawer>
+
+            <ActionDrawer IsOpen="ExibirFormularioCargo"
+                          Title="Cadastro de cargo"
+                          Subtitle="Adicione novos cargos e deixe a estrutura da equipe padronizada para cadastros futuros."
+                          OnClose="FecharFormularios">
+                <div class="home-drawer-grid">
+                    <div>
+                        <label>Nome do cargo</label>
+                        <input class="form-control mb-2" @bind="CargoForm.Nome" />
+                    </div>
+                    <div>
+                        <label>Empresa</label>
+                        <select class="form-select mb-3" @bind="CargoForm.EmpresaId">
+                            @foreach (var empresa in Empresas)
+                            {
+                                <option value="@empresa.EmpresaId">@empresa.Nome</option>
+                            }
+                        </select>
+                    </div>
+                </div>
+
+                <div class="home-drawer-actions">
+                    <button class="btn btn-success" @onclick="CadastrarCargo">Salvar cargo</button>
+                </div>
+
+                @if (!string.IsNullOrEmpty(MessageCargo))
+                {
+                    <div class="alert @(CargoSalvoComSucesso ? "alert-success" : "alert-danger") mt-3">@MessageCargo</div>
+                }
+            </ActionDrawer>
+
+            <ActionDrawer IsOpen="ExibirFormularioEdicaoVinculo"
+                          Title="@TituloEdicaoVinculo"
+                          Subtitle="@SubtituloEdicaoVinculo"
+                          OnClose="FecharFormularios">
+                <div class="home-edit-context">
+                    <span class="home-edit-context__label">Cadastro em edicao</span>
+                    <strong>@EdicaoVinculoForm.Nome</strong>
+                    <small>@EdicaoVinculoForm.EmailAtual</small>
+                </div>
+
+                <div class="home-drawer-grid">
+                    <div>
+                        <label>E-mail atual</label>
+                        <input type="email" class="form-control mb-2" value="@EdicaoVinculoForm.EmailAtual" disabled />
+                    </div>
+                    <div>
+                        <label>Novo e-mail</label>
+                        <input type="email" class="form-control mb-2" @bind="EdicaoVinculoForm.NovoEmail" />
+                    </div>
+                    <div>
+                        <label>Nome</label>
+                        <input class="form-control mb-2" @bind="EdicaoVinculoForm.Nome" />
+                    </div>
+                    <div>
+                        <label>CPF</label>
+                        <input class="form-control mb-2" @bind="EdicaoVinculoForm.CPF" />
+                    </div>
+                    <div>
+                        <label>Tipo de usuario</label>
+                        <select class="form-select mb-2" @bind="EdicaoVinculoForm.TipoUsuario">
+                            <option value="1">Usuario RH</option>
+                            <option value="2">Usuario Apoio</option>
+                            <option value="3">Usuario Colaborador</option>
+                            <option value="4">Usuario Diretoria</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label>Empresa</label>
+                        <select class="form-select mb-2" @bind="EdicaoVinculoForm.EmpresaId">
+                            @foreach (var empresa in Empresas)
+                            {
+                                <option value="@empresa.EmpresaId">@empresa.Nome</option>
+                            }
+                        </select>
+                    </div>
+                    <div>
+                        <label>Cargo</label>
+                        <select class="form-select mb-2" @bind="EdicaoVinculoForm.Cargo">
                             <option value="">-- Selecione --</option>
                             @foreach (var cargo in Cargos)
                             {
                                 <option value="@cargo.Nome">@cargo.Nome</option>
                             }
                         </select>
-                        <button class="btn btn-outline-primary" type="button" @onclick="ToggleNovoCargo">+</button>
                     </div>
-
-                    @if (ExibirNovoCargo)
-                    {
-                        <input class="form-control mb-2" @bind="NovoCargo.Nome" placeholder="Novo cargo" />
-                        <button class="btn btn-success btn-sm mb-2" @onclick="CadastrarNovoCargo">Salvar Cargo</button>
-                        @if (!string.IsNullOrEmpty(MessageCargoInline))
-                        {
-                            <div class="alert alert-info">@MessageCargoInline</div>
-                        }
-                    }
-
-                    <label>Data de Nascimento:</label>
-                    <InputDate @bind-Value="ColaboradorForm.DataNascimento" class="form-control mb-2" />
-
-                    <label>Data de Admissão:</label>
-                    <InputDate @bind-Value="ColaboradorForm.DataAdmissao" class="form-control mb-2" />
-
-
-                    <label>Endereço:</label>
-                    <input class="form-control mb-2" @bind="ColaboradorForm.Endereco" />
-
-                    <label>Gênero:</label>
-                    <select class="form-select mb-3" @bind="ColaboradorForm.Genero">
-                        <option value="">-- Selecione --</option>
-                        <option value="Masculino">Masculino</option>
-                        <option value="Feminino">Feminino</option>
-                        <option value="Outros">Outros</option>
-                    </select>
-
-                    <button class="btn btn-success" @onclick="CadastrarColaborador">Salvar Colaborador</button>
                 </div>
-            }
 
-            @if (ExibirFormularioCargo)
-            {
-                <div class="card">
-                    <h4>Cadastro de Cargo</h4>
-
-                    <label>Nome do Cargo:</label>
-                    <input class="form-control mb-2" @bind="CargoForm.Nome" />
-
-                    <label>Empresa:</label>
-                    <select class="form-select mb-3" @bind="CargoForm.EmpresaId">
-                        @foreach (var empresa in Empresas)
-                        {
-                            <option value="@empresa.EmpresaId">@empresa.Nome</option>
-                        }
-                    </select>
-
-                    <button class="btn btn-success" @onclick="CadastrarCargo">Salvar Cargo</button>
+                <div class="home-drawer-actions">
+                    <button class="btn btn-success" @onclick="SalvarEdicaoVinculo">Salvar alteracoes</button>
                 </div>
-            }
 
-            @if (ExibirFormularioTipoNecessidade)
-            {
-                <div class="card">
-                    <h4>Cadastro de Tipo de Necessidade</h4>
+                @if (!string.IsNullOrEmpty(MessageEdicao))
+                {
+                    <div class="alert @(EdicaoSalvaComSucesso ? "alert-success" : "alert-danger") mt-3">@MessageEdicao</div>
+                }
+            </ActionDrawer>
 
-                    <label>Nome do Tipo de Necessidade:</label>
-                    <input class="form-control mb-2" @bind="TipoNecessidadeForm.Nome" />
-
-                    <label>Empresa:</label>
-                    <select class="form-select mb-3" @bind="TipoNecessidadeForm.EmpresaId">
-                        @foreach (var empresa in Empresas)
-                        {
-                            <option value="@empresa.EmpresaId">@empresa.Nome</option>
-                        }
-                    </select>
-
-                    <button class="btn btn-success" @onclick="CadastrarTipoNecessidade">Salvar Tipo</button>
+            <ActionDrawer IsOpen="ExibirFormularioTipoNecessidade"
+                          Title="Cadastro de tipo de necessidade"
+                          Subtitle="Mantenha o catalogo de necessidades organizado para o dashboard e para a operacao."
+                          OnClose="FecharFormularios">
+                <div class="home-drawer-grid">
+                    <div>
+                        <label>Nome do tipo</label>
+                        <input class="form-control mb-2" @bind="TipoNecessidadeForm.Nome" />
+                    </div>
+                    <div>
+                        <label>Empresa</label>
+                        <select class="form-select mb-3" @bind="TipoNecessidadeForm.EmpresaId">
+                            @foreach (var empresa in Empresas)
+                            {
+                                <option value="@empresa.EmpresaId">@empresa.Nome</option>
+                            }
+                        </select>
+                    </div>
                 </div>
-            }
+
+                <div class="home-drawer-actions">
+                    <button class="btn btn-success" @onclick="CadastrarTipoNecessidade">Salvar tipo</button>
+                </div>
+
+                @if (!string.IsNullOrEmpty(MessageTipo))
+                {
+                    <div class="alert @(TipoSalvoComSucesso ? "alert-success" : "alert-danger") mt-3">@MessageTipo</div>
+                }
+            </ActionDrawer>
         }
-    </div>
-</div>
-
+    </AppShell>
+</AuthGuard>
 
 @code {
-    private bool SidebarAberta = true;
     private UsuarioResponse? Usuario;
     private ColaboradorResponse? Colaborador;
     private bool Carregando = true;
-    private string MensagemErro = "";
-    private bool ExibirFormulario = false;
+    private string MensagemErro = string.Empty;
+    private bool ExibirFormularioUsuario;
+    private bool ExibirFormulario;
     private List<Empresa> Empresas = new();
+    private List<UsuarioGestaoInfo> UsuariosGestao = new();
+    private List<ColaboradorInfo> Colaboradores = new();
+    private OperacaoResumoResponse? ResumoOperacao;
     private ColaboradorRequest ColaboradorForm = new();
-    private string Message = "";
-    private string alertClass = "";
-    private bool ExibirFormularioCargo = false;
+    private string Message = string.Empty;
+    private string alertClass = "alert-success";
+    private bool ExibirFormularioCargo;
     private Cargo CargoForm = new();
-    private string MessageCargo = "";
-    private string alertClassCargo = "";
-    private bool ExibirFormularioTipoNecessidade = false;
+    private string MessageCargo = string.Empty;
+    private bool CargoSalvoComSucesso;
+    private bool ExibirFormularioTipoNecessidade;
     private TipoNecessidade TipoNecessidadeForm = new();
-    private string MessageTipo = "";
-    private string alertClassTipo = "";
+    private string MessageTipo = string.Empty;
+    private bool TipoSalvoComSucesso;
     private List<Cargo> Cargos = new();
-    private bool ExibirNovoCargo = false;
+    private bool ExibirNovoCargo;
     private Cargo NovoCargo = new();
-    private string MessageCargoInline = "";
-    private string NomeEmpresaDemo { get; set; } = "";
+    private string MessageCargoInline = string.Empty;
+    private string NomeEmpresaDemo { get; set; } = string.Empty;
+    private string NovoUsuarioEmail { get; set; } = string.Empty;
+    private string NovoUsuarioCpf { get; set; } = string.Empty;
+    private string NovaUsuarioSenha { get; set; } = string.Empty;
+    private string ConfirmacaoUsuarioSenha { get; set; } = string.Empty;
+    private string MessageUsuario = string.Empty;
+    private bool UsuarioSalvoComSucesso;
+    private ColaboradorInfo? ColaboradorAcessoSelecionado;
+    private bool ExibirFormularioEdicaoVinculo;
+    private UsuarioColaboradorUpdateRequest EdicaoVinculoForm = new();
+    private string MessageEdicao = string.Empty;
+    private bool EdicaoSalvaComSucesso;
+    private string TituloEdicaoVinculo = "Editar usuario e colaborador";
+    private string SubtituloEdicaoVinculo = "Ajuste e-mail, tipo, empresa, nome e cargo mantendo o vinculo da operacao.";
+
+    private Empresa? EmpresaPrincipal =>
+        Colaborador is null
+            ? Empresas.FirstOrDefault()
+            : Empresas.FirstOrDefault(e => e.EmpresaId == Colaborador.EmpresaId) ?? Empresas.FirstOrDefault();
+
+    private string NomeApresentacao =>
+        Colaborador?.Nome
+        ?? Usuario?.Email.Split('@', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault()
+        ?? "time";
+
+    private string TextoDataCadastro =>
+        Usuario is null || Usuario.DataCadastro == default
+            ? "Ainda nao registrado"
+            : Usuario.DataCadastro.ToLocalTime().ToString("dd/MM/yyyy HH:mm");
+
+    private string PerfilUsuario =>
+        Colaborador is null ? "Configuracao inicial" : TipoUsuarioDescricao(Colaborador.TipoUsuario);
+
+    private string StatusDemo
+    {
+        get
+        {
+            if (EmpresaPrincipal?.DataInicioDemo is null)
+            {
+                return "Demo ainda nao ativada";
+            }
+
+            var diasRestantes = Math.Max(0, 30 - (int)(DateTime.UtcNow - EmpresaPrincipal.DataInicioDemo.Value).TotalDays);
+            return diasRestantes > 0
+                ? $"{diasRestantes} dias restantes na demo"
+                : "Periodo demo encerrado";
+        }
+    }
 
     protected override async Task OnInitializedAsync()
     {
         try
         {
-            string? email = await LocalStorage.GetItemAsync<string>("usuario_email");
-            Cargos = await ApiService.GetCargosPorEmail(email) ?? new();
-            if (string.IsNullOrEmpty(email))
+            var email = await SessionService.GetUserEmailAsync();
+            if (string.IsNullOrWhiteSpace(email))
             {
                 Navigation.NavigateTo("/login", true);
                 return;
             }
 
-            Empresas = await ApiService.GetEmpresasAsync(email) ?? new();
-            Usuario = await ApiService.GetUsuarioInfo(email);
-            Colaborador = await ApiService.GetColaboradorInfo(email);
-            var empresa = Empresas.FirstOrDefault(e => e.EmpresaId == Colaborador?.EmpresaId);
-            if (empresa?.DataInicioDemo != null)
+            var cargosTask = ApiService.GetCargosPorEmail(email);
+            var empresasTask = ApiService.GetEmpresasAsync(email);
+            var usuarioTask = ApiService.GetUsuarioInfo(email);
+            var colaboradorTask = ApiService.GetColaboradorInfo(email);
+            var usuariosTask = ApiService.GetUsuariosGestao(email);
+
+            await Task.WhenAll(cargosTask, empresasTask, usuarioTask, colaboradorTask, usuariosTask);
+
+            Cargos = cargosTask.Result ?? new();
+            Empresas = empresasTask.Result ?? new();
+            Usuario = usuarioTask.Result ?? new UsuarioResponse { Email = email };
+            Colaborador = colaboradorTask.Result;
+            UsuariosGestao = usuariosTask.Result ?? new();
+
+            ApplyDefaultCompanySelections();
+
+            await CarregarGestaoAsync(email);
+            ResumoOperacao = await ApiService.GetResumoOperacao(email);
+            NotificationService.Info("Visao geral carregada. Cadastros, perfis e operacao prontos para acompanhamento.");
+
+            if (EmpresaPrincipal?.DataInicioDemo is not null)
             {
-                var diasAtivos = (DateTime.UtcNow - empresa.DataInicioDemo.Value).TotalDays;
+                var diasAtivos = (DateTime.UtcNow - EmpresaPrincipal.DataInicioDemo.Value).TotalDays;
                 if (diasAtivos > 30)
                 {
-                    Navigation.NavigateTo("/expirado", forceLoad: true);
+                    Navigation.NavigateTo("/expirado", true);
                     return;
                 }
             }
         }
         catch
         {
-            MensagemErro = "Erro ao carregar dados do usuário.";
+            MensagemErro = "Erro ao carregar dados do usuario.";
         }
-
-        Carregando = false;
+        finally
+        {
+            Carregando = false;
+        }
     }
 
-    private void ToggleFormulario() { ExibirFormulario = !ExibirFormulario; Message = ""; alertClass = ""; }
-    private void ToggleFormularioCargo() { ExibirFormularioCargo = !ExibirFormularioCargo; MessageCargo = ""; alertClassCargo = ""; CargoForm = new(); }
-    private void ToggleFormularioTipo() { ExibirFormularioTipoNecessidade = !ExibirFormularioTipoNecessidade; MessageTipo = ""; alertClassTipo = ""; TipoNecessidadeForm = new(); }
-    private void ToggleNovoCargo() { ExibirNovoCargo = !ExibirNovoCargo; MessageCargoInline = ""; NovoCargo = new(); if (Empresas.Any()) NovoCargo.EmpresaId = Empresas.First().EmpresaId; }
+    private void ApplyDefaultCompanySelections()
+    {
+        var empresaId = EmpresaPrincipal?.EmpresaId ?? Empresas.FirstOrDefault()?.EmpresaId ?? 0;
+
+        if (empresaId == 0)
+        {
+            return;
+        }
+
+        if (ColaboradorForm.EmpresaId == 0)
+        {
+            ColaboradorForm.EmpresaId = empresaId;
+        }
+
+        if (CargoForm.EmpresaId == 0)
+        {
+            CargoForm.EmpresaId = empresaId;
+        }
+
+        if (TipoNecessidadeForm.EmpresaId == 0)
+        {
+            TipoNecessidadeForm.EmpresaId = empresaId;
+        }
+
+        if (NovoCargo.EmpresaId == 0)
+        {
+            NovoCargo.EmpresaId = empresaId;
+        }
+    }
+
+    private void AbrirFormularioUsuario()
+    {
+        FecharFormularios();
+        ExibirFormularioUsuario = true;
+        ColaboradorAcessoSelecionado = null;
+        NovoUsuarioEmail = string.Empty;
+        NovoUsuarioCpf = string.Empty;
+        NovaUsuarioSenha = string.Empty;
+        ConfirmacaoUsuarioSenha = string.Empty;
+        MessageUsuario = string.Empty;
+        UsuarioSalvoComSucesso = false;
+    }
+
+    private void AbrirFormularioColaborador()
+    {
+        FecharFormularios();
+        ExibirFormulario = true;
+        Message = string.Empty;
+        alertClass = "alert-success";
+    }
+
+    private void AbrirFormularioCargo()
+    {
+        FecharFormularios();
+        ExibirFormularioCargo = true;
+        MessageCargo = string.Empty;
+        CargoSalvoComSucesso = false;
+        CargoForm = new Cargo { EmpresaId = EmpresaPrincipal?.EmpresaId ?? 0 };
+    }
+
+    private void AbrirFormularioTipo()
+    {
+        FecharFormularios();
+        ExibirFormularioTipoNecessidade = true;
+        MessageTipo = string.Empty;
+        TipoSalvoComSucesso = false;
+        TipoNecessidadeForm = new TipoNecessidade { EmpresaId = EmpresaPrincipal?.EmpresaId ?? 0 };
+    }
+
+    private void FecharFormularios()
+    {
+        ExibirFormularioUsuario = false;
+        ExibirFormulario = false;
+        ExibirFormularioCargo = false;
+        ExibirFormularioTipoNecessidade = false;
+        ExibirFormularioEdicaoVinculo = false;
+        ColaboradorAcessoSelecionado = null;
+        MessageUsuario = string.Empty;
+        MessageEdicao = string.Empty;
+    }
+
+    private bool ExisteUsuarioGestao(string email) =>
+        UsuariosGestao.Any(u => string.Equals(u.Email, email, StringComparison.OrdinalIgnoreCase));
+
+    private void VincularUsuario(UsuarioGestaoInfo usuario)
+    {
+        FecharFormularios();
+        ExibirFormulario = true;
+        Message = "Complete os dados do colaborador para concluir o vinculo deste usuario.";
+        alertClass = "alert-info";
+        NotificationService.Info($"Vincule o colaborador para concluir o acesso de {usuario.Email}.");
+        ColaboradorForm = new ColaboradorRequest
+        {
+            Email = usuario.Email,
+            Nome = usuario.Email.Split('@')[0],
+            EmpresaId = EmpresaPrincipal?.EmpresaId ?? Empresas.FirstOrDefault()?.EmpresaId ?? 0,
+            TipoUsuario = 3,
+            DataNascimento = DateTime.Today.AddYears(-25),
+            DataAdmissao = DateTime.Today,
+            Genero = "Nao informado"
+        };
+    }
+
+    private void AbrirEdicaoVinculo(string email)
+    {
+        var usuario = UsuariosGestao.FirstOrDefault(u => string.Equals(u.Email, email, StringComparison.OrdinalIgnoreCase));
+        if (usuario is null)
+        {
+            var colaborador = Colaboradores.FirstOrDefault(c => string.Equals(c.Email, email, StringComparison.OrdinalIgnoreCase));
+            if (colaborador is not null)
+            {
+                AbrirCadastroUsuarioParaColaborador(colaborador);
+                return;
+            }
+
+            Message = "Nao existe usuario de acesso correspondente para este colaborador.";
+            alertClass = "alert-danger";
+            NotificationService.Error("Nao encontrei um usuario de acesso para esse colaborador.");
+            return;
+        }
+
+        AbrirEdicaoVinculo(usuario);
+    }
+
+    private void AbrirEdicaoVinculo(UsuarioGestaoInfo usuario)
+    {
+        FecharFormularios();
+        ExibirFormularioEdicaoVinculo = true;
+        MessageEdicao = string.Empty;
+        EdicaoSalvaComSucesso = false;
+
+        var colaborador = Colaboradores.FirstOrDefault(c => string.Equals(c.Email, usuario.Email, StringComparison.OrdinalIgnoreCase));
+        EdicaoVinculoForm = new UsuarioColaboradorUpdateRequest
+        {
+            EmailAtual = usuario.Email,
+            NovoEmail = usuario.Email,
+            Nome = colaborador?.Nome ?? usuario.ColaboradorNome ?? usuario.Email.Split('@')[0],
+            CPF = colaborador?.CPF ?? usuario.CPF ?? string.Empty,
+            TipoUsuario = colaborador?.TipoUsuario ?? usuario.TipoUsuario ?? 3,
+            Cargo = colaborador?.Cargo ?? usuario.Cargo ?? string.Empty,
+            EmpresaId = colaborador?.EmpresaId ?? usuario.EmpresaId ?? EmpresaPrincipal?.EmpresaId ?? 0
+        };
+
+        TituloEdicaoVinculo = "Editar cadastro";
+        SubtituloEdicaoVinculo = "Atualize os dados principais do acesso e do colaborador em um unico painel.";
+        NotificationService.Info($"Editando o cadastro de {EdicaoVinculoForm.Nome}.");
+    }
+
+    private void AbrirCadastroUsuarioParaColaborador(ColaboradorInfo colaborador)
+    {
+        FecharFormularios();
+        ExibirFormularioUsuario = true;
+        ColaboradorAcessoSelecionado = colaborador;
+        NovoUsuarioEmail = colaborador.Email;
+        NovoUsuarioCpf = colaborador.CPF;
+        NovaUsuarioSenha = string.Empty;
+        ConfirmacaoUsuarioSenha = string.Empty;
+        UsuarioSalvoComSucesso = false;
+        MessageUsuario = "Este colaborador ainda nao tem acesso ao sistema. Crie o acesso diretamente a partir deste cadastro.";
+        NotificationService.Info($"Crie o acesso de {colaborador.Nome} com o CPF e e-mail ja vinculados.");
+    }
+
+    private void ToggleNovoCargo()
+    {
+        ExibirNovoCargo = !ExibirNovoCargo;
+        MessageCargoInline = string.Empty;
+        NovoCargo = new Cargo { EmpresaId = EmpresaPrincipal?.EmpresaId ?? 0 };
+    }
+
+    private async Task CadastrarUsuario()
+    {
+        if (string.IsNullOrWhiteSpace(NovoUsuarioEmail) ||
+            string.IsNullOrWhiteSpace(NovaUsuarioSenha) ||
+            string.IsNullOrWhiteSpace(ConfirmacaoUsuarioSenha))
+        {
+            MessageUsuario = "Preencha e-mail, senha e confirmacao.";
+            UsuarioSalvoComSucesso = false;
+            return;
+        }
+
+        if (NovaUsuarioSenha != ConfirmacaoUsuarioSenha)
+        {
+            MessageUsuario = "As senhas nao coincidem.";
+            UsuarioSalvoComSucesso = false;
+            return;
+        }
+
+        if (ColaboradorAcessoSelecionado is not null && string.IsNullOrWhiteSpace(NovoUsuarioCpf))
+        {
+            MessageUsuario = "O colaborador precisa ter CPF para criar um acesso vinculado.";
+            UsuarioSalvoComSucesso = false;
+            return;
+        }
+
+        string resultado;
+
+        if (ColaboradorAcessoSelecionado is not null)
+        {
+            resultado = await ApiService.CriarAcessoVinculado(new AcessoColaboradorRequest
+            {
+                ColaboradorId = ColaboradorAcessoSelecionado.Id,
+                Email = NovoUsuarioEmail,
+                CPF = NovoUsuarioCpf,
+                Senha = NovaUsuarioSenha
+            });
+        }
+        else
+        {
+            resultado = await ApiService.PostUsuario(NovoUsuarioEmail, NovaUsuarioSenha);
+        }
+
+        UsuarioSalvoComSucesso = resultado == "success";
+        MessageUsuario = resultado == "success"
+            ? (ColaboradorAcessoSelecionado is null
+                ? "Usuario cadastrado com sucesso."
+                : "Acesso criado e vinculado com sucesso.")
+            : resultado;
+
+        if (resultado == "success")
+        {
+            var emailAtual = await SessionService.GetUserEmailAsync();
+            if (!string.IsNullOrWhiteSpace(emailAtual))
+            {
+                await CarregarGestaoAsync(emailAtual);
+            }
+
+            NovoUsuarioEmail = string.Empty;
+            NovoUsuarioCpf = string.Empty;
+            NovaUsuarioSenha = string.Empty;
+            ConfirmacaoUsuarioSenha = string.Empty;
+            ColaboradorAcessoSelecionado = null;
+            NotificationService.Success("Usuario de acesso criado com sucesso.");
+        }
+    }
 
     private async Task AtivarPlanoDemo()
     {
-        if (Usuario == null) return;
+        if (Usuario is null)
+        {
+            return;
+        }
+
         if (string.IsNullOrWhiteSpace(NomeEmpresaDemo))
         {
-            Message = "Por favor, informe o nome da empresa para ativar a demonstração.";
+            Message = "Informe o nome da empresa para ativar a demonstracao.";
             alertClass = "alert-danger";
             return;
         }
 
         var empresa = new Empresa
-            {
-                Nome = NomeEmpresaDemo,
-                CNPJ = "00.000.000/0001-00",
-                Endereco = "Demo - endereço padrão",
-                Email = Usuario.Email,
-                RepresentanteLegal = Usuario.Email,
-                DataFundacao = DateTime.Today,
-                DataInicioDemo = DateTime.UtcNow
-            };
+        {
+            Nome = NomeEmpresaDemo.Trim(),
+            CNPJ = "00.000.000/0001-00",
+            Endereco = "Demo - endereco padrao",
+            Email = Usuario.Email,
+            RepresentanteLegal = Usuario.Email,
+            DataFundacao = DateTime.Today,
+            DataInicioDemo = DateTime.UtcNow
+        };
 
         var sucessoEmpresa = await ApiService.PostEmpresa(empresa);
         if (!sucessoEmpresa)
@@ -290,31 +936,33 @@
             return;
         }
 
-        var empresas = await ApiService.GetEmpresasAsync(Usuario.Email) ?? new();
-        var empresaId = empresas?.LastOrDefault(e => e.Email == Usuario.Email)?.EmpresaId ?? 0;
+        Empresas = await ApiService.GetEmpresasAsync(Usuario.Email) ?? new();
+        ApplyDefaultCompanySelections();
+
+        var empresaId = Empresas.LastOrDefault(e => e.Email == Usuario.Email)?.EmpresaId ?? EmpresaPrincipal?.EmpresaId ?? 0;
 
         var colaborador = new ColaboradorRequest
-            {
-                Nome = Usuario.Email.Split('@')[0],
-                CPF = "00000000000",
-                Email = Usuario.Email,
-                TipoUsuario = 4,
-                EmpresaId = empresaId,
-                Cargo = "Demo User",
-                Endereco = "Endereço Padrão",
-                DataNascimento = DateTime.Today.AddYears(-25),
-                DataAdmissao = DateTime.Today,
-                Genero = "Não informado"
-            };
+        {
+            Nome = Usuario.Email.Split('@')[0],
+            CPF = "00000000000",
+            Email = Usuario.Email,
+            TipoUsuario = 4,
+            EmpresaId = empresaId,
+            Cargo = "Demo User",
+            Endereco = "Endereco padrao",
+            DataNascimento = DateTime.Today.AddYears(-25),
+            DataAdmissao = DateTime.Today,
+            Genero = "Nao informado"
+        };
 
         var resultado = await ApiService.PostColaborador(colaborador);
         if (resultado == "success")
         {
-            Message = "Demonstração ativada com sucesso!";
+            Message = "Demonstracao ativada com sucesso.";
             alertClass = "alert-success";
             Colaborador = await ApiService.GetColaboradorInfo(Usuario.Email);
             ExibirFormulario = false;
-            Navigation.NavigateTo("/home", true);
+            await CarregarGestaoAsync(Usuario.Email);
         }
         else
         {
@@ -325,13 +973,29 @@
 
     private async Task CadastrarColaborador()
     {
+        if (string.IsNullOrWhiteSpace(ColaboradorForm.Nome) ||
+            string.IsNullOrWhiteSpace(ColaboradorForm.CPF) ||
+            string.IsNullOrWhiteSpace(ColaboradorForm.Email) ||
+            string.IsNullOrWhiteSpace(ColaboradorForm.Cargo) ||
+            ColaboradorForm.EmpresaId == 0)
+        {
+            Message = "Preencha nome, CPF, e-mail, cargo e empresa antes de salvar.";
+            alertClass = "alert-danger";
+            return;
+        }
+
         var resultado = await ApiService.PostColaborador(ColaboradorForm);
         if (resultado == "success")
         {
-            Message = "Colaborador cadastrado com sucesso!";
+            Message = "Colaborador cadastrado com sucesso.";
             alertClass = "alert-success";
-            ColaboradorForm = new();
-            Navigation.NavigateTo("/home", true);
+            ColaboradorForm = new ColaboradorRequest { EmpresaId = EmpresaPrincipal?.EmpresaId ?? 0 };
+            NotificationService.Success("Colaborador criado com sucesso.");
+
+            if (Usuario is not null)
+            {
+                await CarregarGestaoAsync(Usuario.Email);
+            }
         }
         else
         {
@@ -340,11 +1004,58 @@
         }
     }
 
+    private async Task SalvarEdicaoVinculo()
+    {
+        if (string.IsNullOrWhiteSpace(EdicaoVinculoForm.EmailAtual) ||
+            string.IsNullOrWhiteSpace(EdicaoVinculoForm.NovoEmail) ||
+            string.IsNullOrWhiteSpace(EdicaoVinculoForm.Nome) ||
+            string.IsNullOrWhiteSpace(EdicaoVinculoForm.CPF) ||
+            string.IsNullOrWhiteSpace(EdicaoVinculoForm.Cargo) ||
+            EdicaoVinculoForm.EmpresaId == 0)
+        {
+            MessageEdicao = "Preencha e-mail, nome, CPF, cargo e empresa antes de salvar.";
+            EdicaoSalvaComSucesso = false;
+            return;
+        }
+
+        var sucesso = await ApiService.AtualizarUsuarioGestao(EdicaoVinculoForm);
+        EdicaoSalvaComSucesso = sucesso;
+        MessageEdicao = sucesso
+            ? "Cadastro atualizado com sucesso."
+            : "Nao foi possivel atualizar o usuario e o colaborador.";
+
+        if (sucesso && Usuario is not null)
+        {
+            NotificationService.Success("Vinculo de usuario e colaborador atualizado com sucesso.");
+            if (string.Equals(Usuario.Email, EdicaoVinculoForm.EmailAtual, StringComparison.OrdinalIgnoreCase))
+            {
+                Usuario.Email = EdicaoVinculoForm.NovoEmail;
+                await SessionService.SignInAsync(EdicaoVinculoForm.NovoEmail);
+            }
+            await CarregarGestaoAsync(Usuario.Email);
+            ExibirFormularioEdicaoVinculo = false;
+        }
+    }
+
     private async Task CadastrarCargo()
     {
+        if (string.IsNullOrWhiteSpace(CargoForm.Nome) || CargoForm.EmpresaId == 0)
+        {
+            MessageCargo = "Informe nome e empresa para o cargo.";
+            CargoSalvoComSucesso = false;
+            return;
+        }
+
         var sucesso = await ApiService.PostCargo(CargoForm);
-        if (sucesso) { MessageCargo = "Cargo cadastrado com sucesso!"; alertClassCargo = "alert-success"; CargoForm = new(); }
-        else { MessageCargo = "Erro ao cadastrar cargo."; alertClassCargo = "alert-danger"; }
+        CargoSalvoComSucesso = sucesso;
+        MessageCargo = sucesso ? "Cargo cadastrado com sucesso." : "Erro ao cadastrar cargo.";
+
+        if (sucesso)
+        {
+            Cargos = await ApiService.GetCargosPorEmail(Usuario?.Email ?? string.Empty) ?? new();
+            CargoForm = new Cargo { EmpresaId = EmpresaPrincipal?.EmpresaId ?? 0 };
+            NotificationService.Success("Cargo cadastrado com sucesso.");
+        }
     }
 
     private async Task CadastrarNovoCargo()
@@ -358,29 +1069,147 @@
         var sucesso = await ApiService.PostCargo(NovoCargo);
         if (sucesso)
         {
-            MessageCargoInline = "Cargo cadastrado com sucesso!";
+            MessageCargoInline = "Cargo cadastrado com sucesso.";
             ExibirNovoCargo = false;
-            Cargos = await ApiService.GetCargosPorEmail(Usuario?.Email ?? "") ?? new();
+            Cargos = await ApiService.GetCargosPorEmail(Usuario?.Email ?? string.Empty) ?? new();
             ColaboradorForm.Cargo = NovoCargo.Nome;
+            NotificationService.Success("Novo cargo disponivel para o cadastro do colaborador.");
         }
-        else { MessageCargoInline = "Erro ao cadastrar cargo."; }
+        else
+        {
+            MessageCargoInline = "Erro ao cadastrar cargo.";
+        }
     }
 
     private async Task CadastrarTipoNecessidade()
     {
+        if (string.IsNullOrWhiteSpace(TipoNecessidadeForm.Nome) || TipoNecessidadeForm.EmpresaId == 0)
+        {
+            MessageTipo = "Informe nome e empresa antes de salvar.";
+            TipoSalvoComSucesso = false;
+            return;
+        }
+
         var sucesso = await ApiService.PostTipoNecessidade(TipoNecessidadeForm);
-        if (sucesso) { MessageTipo = "Tipo de necessidade cadastrado com sucesso!"; alertClassTipo = "alert-success"; TipoNecessidadeForm = new(); }
-        else { MessageTipo = "Erro ao cadastrar tipo de necessidade."; alertClassTipo = "alert-danger"; }
+        TipoSalvoComSucesso = sucesso;
+        MessageTipo = sucesso ? "Tipo de necessidade cadastrado com sucesso." : "Erro ao cadastrar tipo de necessidade.";
+
+        if (sucesso)
+        {
+            TipoNecessidadeForm = new TipoNecessidade { EmpresaId = EmpresaPrincipal?.EmpresaId ?? 0 };
+            NotificationService.Success("Tipo de necessidade cadastrado com sucesso.");
+        }
     }
 
-    private void IrParaTarefas() => Navigation.NavigateTo("/Tarefas");
-    private void IrParaNecessidades() => Navigation.NavigateTo("/Necessidades");
-    private void Logout() => Navigation.NavigateTo("/login");
-    private void IrParaEmpresas() => Navigation.NavigateTo("/Necessidades");
-    private void IrParaDashboard() => Navigation.NavigateTo("/dashboard");
-    private string TipoUsuarioDescricao(int tipo) => tipo switch { 1 => "Usuário RH", 2 => "Usuário Apoio", 3 => "Usuário Colaborador", 4 => "Usuário Diretoria", _ => "Desconhecido" };
-    private void ToggleSidebar()
+    private void IrParaEmpresas()
     {
-        SidebarAberta = !SidebarAberta;
+        Navigation.NavigateTo("/CadastroEmpresa");
+    }
+
+    private async Task CarregarGestaoAsync(string email)
+    {
+        UsuariosGestao = await ApiService.GetUsuariosGestao(email) ?? new();
+        ResumoOperacao = await ApiService.GetResumoOperacao(email);
+        Cargos = await ApiService.GetCargosPorEmail(email) ?? new();
+
+        if (EmpresaPrincipal is null)
+        {
+            Colaboradores = MesclarColaboradores([]);
+            return;
+        }
+
+        var colaboradores = await ApiService.GetColaboradoresAsync(EmpresaPrincipal.EmpresaId) ?? new();
+        Colaboradores = MesclarColaboradores(colaboradores);
+    }
+
+    private List<ColaboradorInfo> MesclarColaboradores(IEnumerable<ColaboradorInfo> colaboradoresBase)
+    {
+        var colaboradores = colaboradoresBase
+            .Select(colaborador => new ColaboradorInfo
+            {
+                Id = colaborador.Id,
+                Nome = colaborador.Nome,
+                CPF = colaborador.CPF,
+                EmpresaId = colaborador.EmpresaId,
+                Email = colaborador.Email,
+                TipoUsuario = colaborador.TipoUsuario,
+                Cargo = colaborador.Cargo
+            })
+            .ToDictionary(
+                colaborador => colaborador.Email.Trim().ToLowerInvariant(),
+                colaborador => colaborador);
+
+        foreach (var usuario in UsuariosGestao)
+        {
+            var email = (usuario.Email ?? string.Empty).Trim().ToLowerInvariant();
+            if (string.IsNullOrWhiteSpace(email))
+            {
+                continue;
+            }
+
+            if (!colaboradores.TryGetValue(email, out var colaborador))
+            {
+                if (string.IsNullOrWhiteSpace(usuario.ColaboradorNome))
+                {
+                    continue;
+                }
+
+                colaborador = new ColaboradorInfo
+                {
+                    Id = usuario.Id,
+                    Nome = usuario.ColaboradorNome ?? usuario.Email ?? string.Empty,
+                    CPF = usuario.CPF ?? string.Empty,
+                    Email = usuario.Email ?? string.Empty,
+                    EmpresaId = usuario.EmpresaId ?? EmpresaPrincipal?.EmpresaId ?? 0,
+                    TipoUsuario = usuario.TipoUsuario ?? 0,
+                    Cargo = usuario.Cargo ?? string.Empty
+                };
+
+                colaboradores[email] = colaborador;
+                continue;
+            }
+
+            if (colaborador.TipoUsuario == 0 && usuario.TipoUsuario.HasValue)
+            {
+                colaborador.TipoUsuario = usuario.TipoUsuario.Value;
+            }
+
+            if (string.IsNullOrWhiteSpace(colaborador.Cargo) && !string.IsNullOrWhiteSpace(usuario.Cargo))
+            {
+                colaborador.Cargo = usuario.Cargo;
+            }
+
+            if (string.IsNullOrWhiteSpace(colaborador.Nome) && !string.IsNullOrWhiteSpace(usuario.ColaboradorNome))
+            {
+                colaborador.Nome = usuario.ColaboradorNome;
+            }
+
+            if (string.IsNullOrWhiteSpace(colaborador.CPF) && !string.IsNullOrWhiteSpace(usuario.CPF))
+            {
+                colaborador.CPF = usuario.CPF;
+            }
+        }
+
+        return colaboradores.Values.OrderBy(colaborador => colaborador.Nome).ToList();
+    }
+
+    private static string TipoUsuarioDescricao(int? tipo) => tipo switch
+    {
+        1 => "Usuario RH",
+        2 => "Usuario Apoio",
+        3 => "Usuario Colaborador",
+        4 => "Usuario Diretoria",
+        _ => "Sem tipo definido"
+    };
+
+    private static string FormatarCpf(string? cpf)
+    {
+        var apenasNumeros = new string((cpf ?? string.Empty).Where(char.IsDigit).ToArray());
+        if (apenasNumeros.Length != 11)
+        {
+            return string.IsNullOrWhiteSpace(cpf) ? "Nao informado" : cpf;
+        }
+
+        return Convert.ToUInt64(apenasNumeros).ToString(@"000\.000\.000\-00");
     }
 }

@@ -1,0 +1,52 @@
+@implements IDisposable
+@inject NotificationService NotificationService
+
+@if (NotificationService.Notifications.Count > 0)
+{
+    <div class="notification-center" aria-live="polite" aria-atomic="true">
+        <div class="notification-center__stack">
+            @foreach (var notification in NotificationService.Notifications)
+            {
+                <article class="notification-toast notification-toast--@notification.Type.ToString().ToLowerInvariant()"
+                         role="alert">
+                    <div class="notification-toast__content">
+                        <strong>@ObterTitulo(notification.Type)</strong>
+                        <p>@notification.Message</p>
+                    </div>
+                    <button type="button"
+                            class="notification-toast__close"
+                            @onclick="() => NotificationService.Remove(notification.Id)"
+                            aria-label="Fechar notificacao">
+                        X
+                    </button>
+                </article>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    protected override void OnInitialized()
+    {
+        NotificationService.OnChange += OnNotificationsChanged;
+    }
+
+    private void OnNotificationsChanged()
+    {
+        InvokeAsync(StateHasChanged);
+    }
+
+    private static string ObterTitulo(NotificationType type) => type switch
+    {
+        NotificationType.Success => "Sucesso",
+        NotificationType.Info => "Informacao",
+        NotificationType.Warning => "Atencao",
+        NotificationType.Error => "Erro",
+        _ => "Atualizacao"
+    };
+
+    public void Dispose()
+    {
+        NotificationService.OnChange -= OnNotificationsChanged;
+    }
+}

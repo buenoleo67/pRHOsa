@@ -1,9 +1,13 @@
-﻿@page "/"
+@page "/"
+@inject SessionService SessionService
 @inject NavigationManager Navigation
 
+<p>Redirecionando...</p>
+
 @code {
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
-        Navigation.NavigateTo("/home", true);
+        var email = await SessionService.GetUserEmailAsync();
+        Navigation.NavigateTo(string.IsNullOrWhiteSpace(email) ? "/login" : "/dashboard", true);
     }
 }

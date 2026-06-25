@@ -1,126 +1,143 @@
-﻿@page "/CadastroEmpresa"
+@page "/CadastroEmpresa"
 @inject API ApiService
 @inject NavigationManager Navigation
-@using pRHosaApp1.Models
-@inject Blazored.LocalStorage.ILocalStorageService LocalStorage
-<h3 class="mb-4">🏢 Cadastro de Empresas</h3>
+@inject SessionService SessionService
 
-@if (!string.IsNullOrEmpty(Message))
-{
-    <div class="alert @AlertClass">@Message</div>
-}
-
-<div class="card p-4 mb-4 shadow-sm">
-    <h5 class="mb-3">Nova Empresa</h5>
-
-    <div class="mb-2">
-        <label class="form-label">Nome:</label>
-        <input class="form-control" @bind="Empresa.Nome" />
-    </div>
-
-    <div class="mb-2">
-        <label class="form-label">CNPJ:</label>
-        <input class="form-control" @bind="Empresa.CNPJ" />
-    </div>
-
-    <div class="mb-2">
-        <label class="form-label">Endereço:</label>
-        <input class="form-control" @bind="Empresa.Endereco" />
-    </div>
-
-    <div class="mb-2">
-        <label class="form-label">Telefone:</label>
-        <input class="form-control" @bind="Empresa.Telefone" />
-    </div>
-
-    <div class="mb-2">
-        <label class="form-label">Email:</label>
-        <input class="form-control" @bind="Empresa.Email" />
-    </div>
-
-    <div class="mb-2">
-        <label class="form-label">Representante Legal:</label>
-        <input class="form-control" @bind="Empresa.RepresentanteLegal" />
-    </div>
-
-    <div class="mb-3">
-        <label class="form-label">Data de Fundação:</label>
-        <input type="date" class="form-control" @bind-value="Empresa.DataFundacao" @bind-value:event="oninput" />
-    </div>
-    <button class="btn btn-success w-100" @onclick="CadastrarEmpresa">Salvar Empresa</button>
-</div>
-
-<h5 class="mb-3">📋 Empresas Cadastradas</h5>
-@if (ListaEmpresas?.Any() == true)
-{
-    <ul class="list-group">
-        @foreach (var empresa in ListaEmpresas)
+<AuthGuard>
+    <AppShell Title="Empresas" Subtitle="Cadastre e acompanhe as empresas vinculadas ao ambiente para manter a estrutura organizacional pronta para escalar.">
+        @if (!string.IsNullOrEmpty(Message))
         {
-            <li class="list-group-item">
-                <b>@empresa.Nome</b> – @empresa.CNPJ<br />
-                <small>@empresa.Endereco</small>
-            </li>
+            <div class="alert @AlertClass">@Message</div>
         }
-    </ul>
-}
-else
-{
-    <div class="text-muted">Nenhuma empresa cadastrada ainda.</div>
-}
+
+        <div class="home-grid">
+            <section class="card">
+                <h3>Nova empresa</h3>
+
+                <div class="home-form-grid">
+                    <div>
+                        <label class="form-label">Nome</label>
+                        <input class="form-control" @bind="Empresa.Nome" />
+                    </div>
+
+                    <div>
+                        <label class="form-label">CNPJ</label>
+                        <input class="form-control" @bind="Empresa.CNPJ" />
+                    </div>
+
+                    <div>
+                        <label class="form-label">Endereco</label>
+                        <input class="form-control" @bind="Empresa.Endereco" />
+                    </div>
+
+                    <div>
+                        <label class="form-label">Telefone</label>
+                        <input class="form-control" @bind="Empresa.Telefone" />
+                    </div>
+
+                    <div>
+                        <label class="form-label">Email</label>
+                        <input class="form-control" @bind="Empresa.Email" />
+                    </div>
+
+                    <div>
+                        <label class="form-label">Representante legal</label>
+                        <input class="form-control" @bind="Empresa.RepresentanteLegal" />
+                    </div>
+
+                    <div>
+                        <label class="form-label">Data de fundacao</label>
+                        <InputDate @bind-Value="Empresa.DataFundacao" class="form-control" />
+                    </div>
+                </div>
+
+                <button class="btn btn-success mt-3" @onclick="CadastrarEmpresa">Salvar empresa</button>
+            </section>
+
+            <section class="card">
+                <h3>Empresas cadastradas</h3>
+
+                @if (ListaEmpresas?.Any() == true)
+                {
+                    <div class="home-info-list">
+                        @foreach (var empresa in ListaEmpresas)
+                        {
+                            <article class="home-metric">
+                                <span>@empresa.CNPJ</span>
+                                <strong>@empresa.Nome</strong>
+                                <small>@empresa.Endereco</small>
+                            </article>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <div class="text-muted">Nenhuma empresa cadastrada ainda.</div>
+                }
+            </section>
+        </div>
+    </AppShell>
+</AuthGuard>
 
 @code {
     private Empresa Empresa = new();
     private List<Empresa>? ListaEmpresas = new();
-    private string Message = "";
-    private string AlertClass = "";
+    private string Message = string.Empty;
+    private string AlertClass = "alert-success";
     private string? UsuarioEmail;
 
     protected override async Task OnInitializedAsync()
     {
-        UsuarioEmail = await LocalStorage.GetItemAsync<string>("usuario_email");
-
-        if (string.IsNullOrEmpty(UsuarioEmail))
+        UsuarioEmail = await SessionService.GetUserEmailAsync();
+        if (string.IsNullOrWhiteSpace(UsuarioEmail))
         {
             Navigation.NavigateTo("/login", true);
             return;
         }
+
+        Empresa.Email = UsuarioEmail;
+        Empresa.RepresentanteLegal = UsuarioEmail;
         await CarregarEmpresas();
-    }
-    private string? DataFundacaoString
-    {
-        get => Empresa.DataFundacao?.ToString("yyyy-MM-dd");
-        set
-        {
-            if (DateTime.TryParse(value, out var dt))
-                Empresa.DataFundacao = dt;
-        }
     }
 
     private async Task CarregarEmpresas()
     {
-        ListaEmpresas = await ApiService.GetEmpresasAsync(UsuarioEmail) ?? new List<Empresa>();
+        if (string.IsNullOrWhiteSpace(UsuarioEmail))
+        {
+            ListaEmpresas = new();
+            return;
+        }
+
+        ListaEmpresas = await ApiService.GetEmpresasAsync(UsuarioEmail) ?? new();
     }
 
     private async Task CadastrarEmpresa()
     {
         if (string.IsNullOrWhiteSpace(Empresa.Nome) || string.IsNullOrWhiteSpace(Empresa.CNPJ))
         {
-            Message = "Nome e CNPJ são obrigatórios.";
+            Message = "Nome e CNPJ sao obrigatorios.";
             AlertClass = "alert-danger";
             return;
         }
 
+        Empresa.Email ??= UsuarioEmail;
+        Empresa.RepresentanteLegal ??= UsuarioEmail;
+
         var sucesso = await ApiService.PostEmpresa(Empresa);
         if (sucesso)
         {
-            Message = "✅ Empresa cadastrada com sucesso!";
+            Message = "Empresa cadastrada com sucesso.";
             AlertClass = "alert-success";
-            Empresa = new();
+            Empresa = new Empresa
+            {
+                Email = UsuarioEmail,
+                RepresentanteLegal = UsuarioEmail
+            };
             await CarregarEmpresas();
         }
         else
         {
-            Message = "❌ Erro ao cadastrar empresa.";
+            Message = "Erro ao cadastrar empresa.";
             AlertClass = "alert-danger";
         }
     }

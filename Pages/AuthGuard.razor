@@ -1,18 +1,27 @@
-﻿@inject Blazored.LocalStorage.ILocalStorageService LocalStorage
+@inject SessionService SessionService
 @inject NavigationManager Navigation
+
+@if (Verificando)
+{
+    <p>Verificando autenticacao...</p>
+}
+else if (Autenticado)
+{
+    @ChildContent
+}
 
 @code {
     private bool Verificando = true;
-    private bool Autenticado = false;
+    private bool Autenticado;
 
     [Parameter]
-    public RenderFragment? ChildContent { get; set; } // Permite que o conteúdo seja renderizado dentro do componente
+    public RenderFragment? ChildContent { get; set; }
 
     protected override async Task OnInitializedAsync()
     {
-        var email = await LocalStorage.GetItemAsync<string>("usuario_email");
+        var email = await SessionService.GetUserEmailAsync();
 
-        if (string.IsNullOrEmpty(email))
+        if (string.IsNullOrWhiteSpace(email))
         {
             Navigation.NavigateTo("/login", true);
         }
@@ -23,13 +32,4 @@
 
         Verificando = false;
     }
-}
-
-@if (Verificando)
-{
-    <p>Verificando autenticação...</p>
-}
-else if (Autenticado)
-{
-    @ChildContent
 }

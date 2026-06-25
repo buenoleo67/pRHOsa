@@ -1,30 +1,93 @@
-﻿@page "/register"
+@page "/register"
 @inject API ApiService
 @inject NavigationManager Navigation
+@inject NotificationService NotificationService
 
 <div class="register-page">
-    <div class="register-container">
-        <img src="images/logo.png" alt="Logo" class="register-logo" />
-        <h3>Registro de Usuário</h3>
+    <section class="register-showcase">
+        <span class="register-pill">Primeiro acesso</span>
+        <h1>Estruture o ambiente com clareza desde o primeiro cadastro.</h1>
+        <p>Crie sua conta inicial para liberar a organizacao de usuarios, colaboradores, empresas e necessidades dentro do padrao visual da nova pRHosa.</p>
+
+        <div class="register-showcase__preview">
+            <div class="register-showcase__preview-header">
+                <div>
+                    <span>Configuracao inicial</span>
+                    <strong>Base pronta para a operacao</strong>
+                </div>
+                <div class="register-showcase__preview-badge">Fluxo recomendado</div>
+            </div>
+
+            <div class="register-showcase__timeline">
+                <article>
+                    <div class="register-step-index">01</div>
+                    <div>
+                        <strong>Criar a conta principal</strong>
+                        <span>Defina o acesso inicial para governar o ambiente.</span>
+                    </div>
+                </article>
+                <article>
+                    <div class="register-step-index">02</div>
+                    <div>
+                        <strong>Organizar empresas e perfis</strong>
+                        <span>Cadastros, cargos, tipos e estruturas com mais consistencia.</span>
+                    </div>
+                </article>
+                <article>
+                    <div class="register-step-index">03</div>
+                    <div>
+                        <strong>Ativar o fluxo de necessidades</strong>
+                        <span>Comunicacao, prazos e historico no mesmo ecossistema.</span>
+                    </div>
+                </article>
+            </div>
+        </div>
+
+        <div class="register-showcase__steps">
+            <article>
+                <strong>1. Criar a conta</strong>
+                <span>Cadastre o acesso inicial da empresa.</span>
+            </article>
+            <article>
+                <strong>2. Organizar o contexto</strong>
+                <span>Estruture empresas, cargos e perfis com mais seguranca.</span>
+            </article>
+            <article>
+                <strong>3. Escalar a operacao</strong>
+                <span>Ative o fluxo de demandas com historico e indicadores.</span>
+            </article>
+        </div>
+    </section>
+
+    <section class="register-container">
+        <div class="register-container__header">
+            <img src="/images/logo-prhosa.png" alt="Logo PrHosa" class="register-logo" />
+            <div>
+                <span class="register-pill register-pill--soft">Workspace pRHosa</span>
+                <h3>Registro de usuario</h3>
+                <p>Use seu e-mail corporativo para criar o acesso inicial com seguranca.</p>
+            </div>
+        </div>
 
         @if (!string.IsNullOrEmpty(Message))
         {
             <div class="alert @alertClass">@Message</div>
         }
 
-        <label>E-mail:</label>
-        <input type="email" class="form-control" @bind="Email" />
+        <div class="register-form">
+            <label for="register-email">E-mail</label>
+            <input id="register-email" type="email" class="form-control" @bind="Email" autocomplete="username" placeholder="voce@empresa.com.br" />
 
-        <label>Senha:</label>
-        <input type="password" class="form-control" @bind="Password" />
+            <label for="register-password">Senha</label>
+            <input id="register-password" type="password" class="form-control" @bind="Password" autocomplete="new-password" placeholder="Crie uma senha forte" />
 
-        <label>Confirmar Senha:</label>
-        <input type="password" class="form-control" @bind="ConfirmPassword" />
+            <label for="register-confirm-password">Confirmar senha</label>
+            <input id="register-confirm-password" type="password" class="form-control" @bind="ConfirmPassword" autocomplete="new-password" placeholder="Repita a senha" />
 
-        <button class="btn btn-primary mt-3" @onclick="RegistrarUsuario">Registrar</button>
-    </div>
+            <button class="btn btn-primary mt-3" @onclick="RegistrarUsuario">Registrar conta</button>
+        </div>
+    </section>
 </div>
-
 
 @code {
     private string Email { get; set; } = string.Empty;
@@ -35,39 +98,60 @@
 
     private async Task RegistrarUsuario()
     {
-        if (string.IsNullOrWhiteSpace(Email) ||
-            string.IsNullOrWhiteSpace(Password) ||
-            string.IsNullOrWhiteSpace(ConfirmPassword))
+        try
         {
-            Message = "Preencha todos os campos!";
-            alertClass = "alert-danger";
-            return;
-        }
+            if (string.IsNullOrWhiteSpace(Email) ||
+                string.IsNullOrWhiteSpace(Password) ||
+                string.IsNullOrWhiteSpace(ConfirmPassword))
+            {
+                Message = "Preencha todos os campos!";
+                alertClass = "alert-danger";
+                return;
+            }
 
-        if (Password != ConfirmPassword)
-        {
-            Message = "As senhas não coincidem!";
-            alertClass = "alert-danger";
-            return;
-        }
+            if (Password != ConfirmPassword)
+            {
+                Message = "As senhas nao coincidem!";
+                alertClass = "alert-danger";
+                return;
+            }
 
-        var resultado = await ApiService.PostUsuario(Email, Password);
+            var resultado = await ApiService.PostUsuario(Email, Password);
 
-        if (resultado == "success")
-        {
-            Message = "Usuário registrado com sucesso!";
-            alertClass = "alert-success";
-            Navigation.NavigateTo("/login", true);
-            return;
+            if (resultado == "success")
+            {
+                Message = "Usuario registrado com sucesso!";
+                alertClass = "alert-success";
+                NotificationService.Success("Conta criada com sucesso.");
+                Navigation.NavigateTo("/login");
+                return;
+            }
+
+            if (resultado == "network_error")
+            {
+                Message = "Nao foi possivel conectar com a API. Verifique se a origem do pRHosa foi liberada no CORS da ApiTino.";
+                alertClass = "alert-danger";
+                NotificationService.Warning("Conexao bloqueada pela API ou indisponivel.");
+                return;
+            }
+
+            if (resultado.Contains("e-mail", StringComparison.OrdinalIgnoreCase) ||
+                resultado.Contains("email", StringComparison.OrdinalIgnoreCase) ||
+                resultado.Contains("cpf", StringComparison.OrdinalIgnoreCase))
+            {
+                Message = resultado;
+                alertClass = "alert-warning";
+            }
+            else
+            {
+                Message = "Erro ao registrar usuario!";
+                alertClass = "alert-danger";
+            }
         }
-        else if (resultado.Contains("Este e-mail já está cadastrado"))
+        catch (Exception ex)
         {
-            Message = resultado; // Exibe a mensagem retornada pela API
-            alertClass = "alert-warning";
-        }
-        else
-        {
-            Message = "Erro ao registrar usuário!";
+            Console.WriteLine($"❌ Erro inesperado na tela de registro: {ex.Message}");
+            Message = "Ocorreu um erro inesperado ao registrar usuario.";
             alertClass = "alert-danger";
         }
     }

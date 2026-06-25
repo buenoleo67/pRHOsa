@@ -1,0 +1,43 @@
+.home-grid,
+.home-form-grid,
+.home-info-list {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;
+}
+
+.home-metric {
+    padding: 1rem;
+    border-radius: 20px;
+    background: linear-gradient(180deg, #f8fcfb 0%, #eef7f4 100%);
+    border: 1px solid rgba(15, 123, 108, 0.12);
+}
+
+.home-metric span {
+    display: block;
+    font-size: 0.82rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #5c7e76;
+    margin-bottom: 0.35rem;
+}
+
+.home-metric strong {
+    display: block;
+    color: #143b34;
+    font-size: 1.3rem;
+    line-height: 1.1;
+    letter-spacing: -0.04em;
+}
+
+.home-metric small {
+    color: #61857c;
+}
+
+@media (max-width: 900px) {
+    .home-grid,
+    .home-form-grid,
+    .home-info-list {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}

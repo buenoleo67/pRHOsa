@@ -1,119 +1,828 @@
-﻿@page "/dashboard"
+@page "/dashboard"
 @inject API ApiService
+@inject SessionService SessionService
+@inject NavigationManager Navigation
+@inject NotificationService NotificationService
 
-<h3>Painel de Gestão</h3>
-@if (pieConfig == null || barConfig == null)
-{
-    <p>Carregando dados e gráficos...</p>
-}
-else
-{
-    <div class="dashboard-cards">
-        <div class="card">Total de Tarefas: @tarefasPorStatus.Sum(x => x.Total)</div>
-        <div class="card">Total de Necessidades: @necessidadesPorTipo.Sum(x => x.Total)</div>
-    </div>
+<AuthGuard>
+    <AppShell Title="Dashboard" Subtitle="Uma leitura executiva da operacao para acompanhar backlog, produtividade, riscos de prazo e experiencia do colaborador.">
+        @if (Carregando)
+        {
+            <div class="loading-progress"></div>
+        }
+        else if (!string.IsNullOrEmpty(MensagemErro))
+        {
+            <div class="alert alert-danger">@MensagemErro</div>
+        }
+        else
+        {
+            <section class="dashboard-hero">
+                <div class="dashboard-hero__content">
+                    <span class="dashboard-hero__eyebrow">Resumo executivo</span>
+                    <h2>@Saudacao</h2>
+                    <p>@DescricaoHeroi</p>
 
-    <div class="charts">
-        <PieChart Config="@pieConfig" />
-        <BarChart Config="@barConfig" />
-    </div>
-}
+                    <div class="dashboard-hero__signal-strip">
+                        @foreach (var signal in HeroSignals)
+                        {
+                            <div class="dashboard-hero__signal @signal.CssClass">
+                                <span>@signal.Label</span>
+                                <strong>@signal.Value</strong>
+                                <small>@signal.SupportingText</small>
+                            </div>
+                        }
+                    </div>
+                </div>
+
+                <div class="dashboard-hero__meta">
+                    <div>
+                        <span>Empresa</span>
+                        <strong>@EmpresaResumo</strong>
+                    </div>
+                    <div>
+                        <span>Perfil</span>
+                        <strong>@PerfilResumo</strong>
+                    </div>
+                    <div>
+                        <span>Demo</span>
+                        <strong>@StatusDemo</strong>
+                    </div>
+                    <div class="dashboard-hero__story">
+                        <span>Foco do momento</span>
+                        <strong>@FocoOperacionalTitulo</strong>
+                        <p>@FocoOperacionalDescricao</p>
+                    </div>
+                </div>
+            </section>
+
+            <section class="dashboard-section-intro">
+                <div>
+                    <span>Pulso do workspace</span>
+                    <h3>Indicadores para ler ritmo, pressao e experiencia sem perder contexto.</h3>
+                </div>
+                <p>Uma camada executiva inspirada na linguagem da landing page: limpa, direta e pronta para apoiar decisao rapida.</p>
+            </section>
+
+            <section class="dashboard-kpis">
+                <article class="dashboard-kpi dashboard-kpi--accent">
+                    <span>Tarefas pendentes</span>
+                    <strong>@TarefasPendentes</strong>
+                    <small>@(TarefasAtrasadas > 0 ? $"{TarefasAtrasadas} atrasadas" : "Nenhum prazo estourado")</small>
+                </article>
+                <article class="dashboard-kpi">
+                    <span>Necessidades abertas</span>
+                    <strong>@NecessidadesAbertas</strong>
+                    <small>@(NecessidadesCriticas > 0 ? $"{NecessidadesCriticas} em nivel critico" : "Fila sob controle")</small>
+                </article>
+                <article class="dashboard-kpi">
+                    <span>Conclusao de tarefas</span>
+                    <strong>@PercentualConclusaoTarefas%</strong>
+                    <small>@TarefasFechadas de @Tarefas.Count fechadas</small>
+                </article>
+                <article class="dashboard-kpi">
+                    <span>Satisfacao media</span>
+                    <strong>@MediaSatisfacaoTexto</strong>
+                    <small>@TotalAvaliacoes nota(s) registradas</small>
+                </article>
+            </section>
+
+            <section class="dashboard-executive-grid">
+                <article class="dashboard-spotlight">
+                    <div class="dashboard-panel__header">
+                        <div>
+                            <h3>Leitura de performance</h3>
+                            <p>Indicadores de ritmo, risco e experiencia usando o recorte operacional atual.</p>
+                        </div>
+                    </div>
+
+                    <div class="dashboard-signal-grid">
+                        <div class="dashboard-signal-card">
+                            <span>Volume desta semana</span>
+                            <strong>@NecessidadesAbertasSemanaAtual</strong>
+                            <small>@ComparativoNecessidadesSemana</small>
+                        </div>
+                        <div class="dashboard-signal-card">
+                            <span>Tarefas criadas</span>
+                            <strong>@TarefasCriadasSemanaAtual</strong>
+                            <small>@ComparativoTarefasSemana</small>
+                        </div>
+                        <div class="dashboard-signal-card">
+                            <span>Vencem hoje</span>
+                            <strong>@TarefasVencendoHoje</strong>
+                            <small>@(TarefasVencendoHoje > 0 ? "Precisa de atencao imediata" : "Sem pressao no dia")</small>
+                        </div>
+                        <div class="dashboard-signal-card">
+                            <span>Proximas 48h</span>
+                            <strong>@TarefasNasProximas48h</strong>
+                            <small>@(TarefasNasProximas48h > 0 ? "Carteira com vencimentos proximos" : "Agenda controlada")</small>
+                        </div>
+                    </div>
+                </article>
+
+                <article class="dashboard-panel dashboard-panel--dark">
+                    <div class="dashboard-panel__header dashboard-panel__header--light">
+                        <div>
+                            <h3>Saude da operacao</h3>
+                            <p>Uma leitura consolidada do que esta pressionando a mesa do RH agora.</p>
+                        </div>
+                    </div>
+
+                    <div class="dashboard-health-list">
+                        <div class="dashboard-health-item">
+                            <span class="dashboard-health-item__label">Backlog critico</span>
+                            <strong>@NecessidadesCriticas</strong>
+                            <small>@(NecessidadesCriticas > 0 ? "Demandas com urgencia alta ou complexidade elevada" : "Sem concentracao critica")</small>
+                        </div>
+                        <div class="dashboard-health-item">
+                            <span class="dashboard-health-item__label">Atrasos ativos</span>
+                            <strong>@TarefasAtrasadas</strong>
+                            <small>@(TarefasAtrasadas > 0 ? "Itens fora do prazo pedem redistribuicao" : "Operacao dentro do combinado")</small>
+                        </div>
+                        <div class="dashboard-health-item">
+                            <span class="dashboard-health-item__label">Satisfacao</span>
+                            <strong>@MediaSatisfacaoTexto</strong>
+                            <small>@(TotalAvaliacoes > 0 ? $"{TotalAvaliacoes} feedback(s) ja coletados" : "Ainda sem base de experiencia")</small>
+                        </div>
+                    </div>
+                </article>
+            </section>
+
+            @if (ResumoOperacao is not null)
+            {
+                <section class="dashboard-grid">
+                    <article class="dashboard-panel">
+                        <div class="dashboard-panel__header">
+                            <div>
+                                <h3>Fila operacional</h3>
+                                <p>Recorte rapido das prioridades que pedem acao do RH</p>
+                            </div>
+                        </div>
+
+                        <div class="dashboard-chip-list">
+                            @foreach (var fila in ResumoOperacao.FilasNecessidades)
+                            {
+                                <div class="dashboard-chip">
+                                    <span>@fila.Label</span>
+                                    <strong>@fila.Total</strong>
+                                </div>
+                            }
+                        </div>
+                    </article>
+
+                    <article class="dashboard-panel">
+                        <div class="dashboard-panel__header">
+                            <div>
+                                <h3>Risco operacional</h3>
+                                <p>Itens que exigem distribuicao e resposta do time</p>
+                            </div>
+                        </div>
+
+                        <div class="dashboard-chip-list">
+                            <div class="dashboard-chip">
+                                <span>Sem responsavel</span>
+                                <strong>@ResumoOperacao.TotalTarefasSemResponsavel</strong>
+                            </div>
+                            <div class="dashboard-chip">
+                                <span>Alertas hoje</span>
+                                <strong>@ResumoOperacao.TotalAlertasHoje</strong>
+                            </div>
+                            <div class="dashboard-chip">
+                                <span>Perfil</span>
+                                <strong>@ResumoOperacao.PerfilAtual</strong>
+                            </div>
+                        </div>
+                    </article>
+                </section>
+            }
+
+            <section class="dashboard-grid">
+                <article class="dashboard-panel">
+                    <div class="dashboard-panel__header">
+                        <div>
+                            <h3>Status de tarefas</h3>
+                            <p>@Tarefas.Count registro(s) monitorados</p>
+                        </div>
+                    </div>
+
+                    <div class="dashboard-bars">
+                        @foreach (var item in TarefasPorStatus)
+                        {
+                            <div class="dashboard-bar">
+                                <div class="dashboard-bar__label">
+                                    <span>@item.Label</span>
+                                    <strong>@item.Count</strong>
+                                </div>
+                                <div class="dashboard-bar__track">
+                                    <div class="dashboard-bar__fill @item.CssClass" style="width: @item.Percentage.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)%"></div>
+                                </div>
+                                <small>@item.Percentage.ToString("0")%</small>
+                            </div>
+                        }
+                    </div>
+                </article>
+
+                <article class="dashboard-panel">
+                    <div class="dashboard-panel__header">
+                        <div>
+                            <h3>Status de necessidades</h3>
+                            <p>@Necessidades.Count registro(s) monitorados</p>
+                        </div>
+                    </div>
+
+                    <div class="dashboard-bars">
+                        @foreach (var item in NecessidadesPorStatus)
+                        {
+                            <div class="dashboard-bar">
+                                <div class="dashboard-bar__label">
+                                    <span>@item.Label</span>
+                                    <strong>@item.Count</strong>
+                                </div>
+                                <div class="dashboard-bar__track">
+                                    <div class="dashboard-bar__fill @item.CssClass" style="width: @item.Percentage.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)%"></div>
+                                </div>
+                                <small>@item.Percentage.ToString("0")%</small>
+                            </div>
+                        }
+                    </div>
+                </article>
+
+                <article class="dashboard-panel">
+                    <div class="dashboard-panel__header">
+                        <div>
+                            <h3>Carga por responsavel</h3>
+                            <p>Visao rapida para distribuicao do trabalho</p>
+                        </div>
+                    </div>
+
+                    @if (CargaPorResponsavel.Any())
+                    {
+                        <div class="dashboard-bars">
+                            @foreach (var item in CargaPorResponsavel)
+                            {
+                                <div class="dashboard-bar">
+                                    <div class="dashboard-bar__label">
+                                        <span>@item.Label</span>
+                                        <strong>@item.Count</strong>
+                                    </div>
+                                    <div class="dashboard-bar__track">
+                                        <div class="dashboard-bar__fill dashboard-bar__fill--neutral" style="width: @item.Percentage.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)%"></div>
+                                    </div>
+                                    <small>@item.Subtitle</small>
+                                </div>
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <p class="text-muted">Ainda nao ha distribuicao de tarefas suficiente para compor a analise.</p>
+                    }
+                </article>
+
+                <article class="dashboard-panel">
+                    <div class="dashboard-panel__header">
+                        <div>
+                            <h3>Radar de prioridades</h3>
+                            <p>Backlog organizado por urgencia declarada</p>
+                        </div>
+                    </div>
+
+                    @if (NecessidadesPorPrioridade.Any())
+                    {
+                        <div class="dashboard-chip-list">
+                            @foreach (var item in NecessidadesPorPrioridade)
+                            {
+                                <div class="dashboard-chip">
+                                    <span>@item.Label</span>
+                                    <strong>@item.Count</strong>
+                                </div>
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <p class="text-muted">Sem necessidades abertas para priorizar neste momento.</p>
+                    }
+                </article>
+            </section>
+
+            <section class="dashboard-executive-grid">
+                <article class="dashboard-panel">
+                    <div class="dashboard-panel__header">
+                        <div>
+                            <h3>Radar semanal</h3>
+                            <p>Comparativo simples para perceber ganho ou perda de tracao.</p>
+                        </div>
+                    </div>
+
+                    <div class="dashboard-trend-list">
+                        @foreach (var indicador in RadarSemanal)
+                        {
+                            <div class="dashboard-trend-item">
+                                <div>
+                                    <span>@indicador.Label</span>
+                                    <strong>@indicador.Current</strong>
+                                </div>
+                                <div class="dashboard-trend-badge @(indicador.DirectionCss)">
+                                    @indicador.ComparisonText
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </article>
+
+                <article class="dashboard-panel">
+                    <div class="dashboard-panel__header">
+                        <div>
+                            <h3>Mix de demanda</h3>
+                            <p>Quais tipos de solicitacao estao mais puxando a operacao neste momento.</p>
+                        </div>
+                    </div>
+
+                    @if (TopTiposNecessidade.Any())
+                    {
+                        <div class="dashboard-bars">
+                            @foreach (var item in TopTiposNecessidade)
+                            {
+                                <div class="dashboard-bar">
+                                    <div class="dashboard-bar__label">
+                                        <span>@item.Label</span>
+                                        <strong>@item.Count</strong>
+                                    </div>
+                                    <div class="dashboard-bar__track">
+                                        <div class="dashboard-bar__fill dashboard-bar__fill--accent" style="width: @item.Percentage.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)%"></div>
+                                    </div>
+                                    <small>@item.Subtitle</small>
+                                </div>
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <p class="text-muted">Ainda nao ha distribuicao suficiente por tipo para leitura executiva.</p>
+                    }
+                </article>
+            </section>
+
+            <section class="dashboard-list-grid">
+                <article class="dashboard-panel">
+                    <div class="dashboard-panel__header">
+                        <div>
+                            <h3>Proximas entregas</h3>
+                            <p>Tarefas abertas ou em andamento por vencimento</p>
+                        </div>
+                    </div>
+
+                    @if (ProximasEntregas.Any())
+                    {
+                        <ul class="dashboard-list">
+                            @foreach (var tarefa in ProximasEntregas)
+                            {
+                                <li class="dashboard-list__item">
+                                    <div>
+                                        <strong>@tarefa.Descricao</strong>
+                                        <p>@ObterNomeResponsavel(tarefa.UsuarioResponsavelId)</p>
+                                    </div>
+                                    <div class="dashboard-badge @(TarefaAtrasada(tarefa) ? "dashboard-badge--danger" : "dashboard-badge--neutral")">
+                                        @tarefa.DataLimite.ToLocalTime().ToString("dd/MM HH:mm")
+                                    </div>
+                                </li>
+                            }
+                        </ul>
+                    }
+                    else
+                    {
+                        <p class="text-muted">Nao existem tarefas pendentes no momento.</p>
+                    }
+                </article>
+
+                <article class="dashboard-panel">
+                    <div class="dashboard-panel__header">
+                        <div>
+                            <h3>Backlog critico</h3>
+                            <p>Demandas abertas ordenadas por prioridade e complexidade</p>
+                        </div>
+                    </div>
+
+                    @if (BacklogCritico.Any())
+                    {
+                        <ul class="dashboard-list">
+                            @foreach (var necessidade in BacklogCritico)
+                            {
+                                <li class="dashboard-list__item">
+                                    <div>
+                                        <strong>@necessidade.Titulo</strong>
+                                        <p>@ObterNomeTipo(necessidade.TipoNecessidade)</p>
+                                    </div>
+                                    <div class="dashboard-badge">
+                                        @($"P{necessidade.Prioridade} / C{necessidade.Complexidade}")
+                                    </div>
+                                </li>
+                            }
+                        </ul>
+                    }
+                    else
+                    {
+                        <p class="text-muted">Sem backlog critico registrado.</p>
+                    }
+                </article>
+            </section>
+        }
+    </AppShell>
+</AuthGuard>
 
 @code {
-    private List<TarefasPorStatusResponse> tarefasPorStatus = new();
-    private List<NecessidadesPorTipoResponse> necessidadesPorTipo = new();
+    private bool Carregando = true;
+    private string MensagemErro = string.Empty;
+    private string? UsuarioEmail;
+    private UsuarioResponse? Usuario;
+    private ColaboradorResponse? Colaborador;
+    private Empresa? EmpresaAtual;
+    private List<ColaboradorInfo> Colaboradores = new();
+    private List<TarefaResponse> Tarefas = new();
+    private List<NecessidadeResponse> Necessidades = new();
+    private List<TipoNecessidade> TiposNecessidade = new();
+    private OperacaoResumoResponse? ResumoOperacao;
+    private string NomeExibicao => ObterNomeExibicao();
 
-    private PieConfig pieConfig;
-    private BarConfig barConfig;
-    protected override async Task OnInitializedAsync()
+    private string Saudacao =>
+        string.IsNullOrWhiteSpace(NomeExibicao)
+            ? "Visibilidade completa da operacao."
+            : $"Boa gestao, {NomeExibicao}.";
+
+    private string DescricaoHeroi =>
+        TarefasPendentes == 0 && NecessidadesAbertas == 0
+            ? "O ambiente esta sem pendencias abertas. Use este painel para acompanhar crescimento, governanca e qualidade da resposta conforme o volume evoluir."
+            : $"Hoje voce tem {NecessidadesAbertas} necessidade(s) aberta(s) e {TarefasPendentes} tarefa(s) pendente(s), com foco especial em {TarefasAtrasadas} prazo(s) vencido(s).";
+
+    private string PerfilAtual => Colaborador?.TipoUsuario switch
     {
-        // Inicializa os objetos de configuração antes de buscar os dados
-        pieConfig = new PieConfig
-            {
-                Options = new PieOptions
-                {
-                    Responsive = true,
-                    Title = new OptionsTitle { Display = true, Text = "Tarefas por Status" }
-                }
-            };
-
-        barConfig = new BarConfig
-            {
-                Options = new BarOptions
-                {
-                    Responsive = true,
-                    Title = new OptionsTitle { Display = true, Text = "Necessidades por Tipo" }
-                }
-            };
-
-        // Chamada de dados reais
-        tarefasPorStatus = await ApiService.GetTarefasPorStatus();
-
-        // Necessidades mockadas (trocaremos por endpoint real)
-        necessidadesPorTipo = new()
-    {
-        new NecessidadesPorTipoResponse { Tipo = "Admissão", Total = 5 },
-        new NecessidadesPorTipoResponse { Tipo = "Treinamento", Total = 3 },
-        new NecessidadesPorTipoResponse { Tipo = "Documentação", Total = 2 }
+        1 => "Usuario RH",
+        2 => "Usuario Apoio",
+        3 => "Usuario Colaborador",
+        4 => "Usuario Diretoria",
+        _ => "Conta inicial"
     };
 
-        ConfigurarPizza();
-        ConfigurarBarra();
-    }
+    private string EmpresaResumo => EmpresaAtual?.Nome ?? "Estrutura inicial";
+    private string PerfilResumo => Colaborador is null ? "Conta inicial" : PerfilAtual;
+    private string FocoOperacionalTitulo =>
+        TarefasAtrasadas > 0
+            ? "Prazos pedem redistribuicao"
+            : NecessidadesCriticas > 0
+                ? "Backlog requer atencao"
+                : "Operacao em ritmo saudavel";
+    private string FocoOperacionalDescricao =>
+        TarefasAtrasadas > 0
+            ? "Existem entregas fora do combinado. Vale revisar responsaveis e priorizacao para reduzir atrito."
+            : NecessidadesCriticas > 0
+                ? "Ha demandas abertas com maior urgencia. Uma leitura rapida aqui ajuda a antecipar gargalos."
+                : "A fila atual esta controlada. O painel pode ser usado para manter previsibilidade e reforcar qualidade de resposta.";
 
-
-    private void ConfigurarPizza()
+    private string StatusDemo
     {
-        pieConfig = new PieConfig
+        get
         {
-            Options = new PieOptions
+            if (EmpresaAtual?.DataInicioDemo is null)
             {
-                Responsive = true,
-                Title = new OptionsTitle { Display = true, Text = "Tarefas por Status" }
+                return "Nao ativada";
             }
-        };
 
-        foreach (var item in tarefasPorStatus)
-            pieConfig.Data.Labels.Add(item.Status);
-
-        var dataset = new PieDataset<int>(tarefasPorStatus.Select(x => x.Total).ToList())
-        {
-            BackgroundColor = new IndexableOption<string>(
-                tarefasPorStatus.Select(_ => ColorUtil.RandomColorString()).ToArray()
-            )
-        };
-
-        pieConfig.Data.Datasets.Add(dataset);
+            var diasRestantes = Math.Max(0, 30 - (int)(DateTime.UtcNow - EmpresaAtual.DataInicioDemo.Value).TotalDays);
+            return diasRestantes > 0 ? $"{diasRestantes} dia(s) restantes" : "Encerrada";
+        }
     }
 
-    private void ConfigurarBarra()
+    private int TarefasPendentes => Tarefas.Count(t => t.Status is "Aberta" or "Em Andamento");
+    private int TarefasAtrasadas => Tarefas.Count(TarefaAtrasada);
+    private int TarefasFechadas => Tarefas.Count(t => t.Status == "Fechada");
+    private int NecessidadesAbertas => Necessidades.Count(n => n.Status == "Aberta");
+    private int NecessidadesCriticas => Necessidades.Count(n => n.Status == "Aberta" && n.Prioridade <= 2);
+    private int TotalAvaliacoes => Necessidades.Count(n => (n.NotaSatisfacaoColaborador ?? 0) > 0 || (n.NotaSatisfacaoRH ?? 0) > 0);
+    private DateTime HojeLocal => DateTime.Now.Date;
+    private DateTime InicioSemanaAtual => HojeLocal.AddDays(-((int)HojeLocal.DayOfWeek + 6) % 7);
+    private DateTime InicioSemanaAnterior => InicioSemanaAtual.AddDays(-7);
+    private int NecessidadesAbertasSemanaAtual => Necessidades.Count(n => n.DataCriacao.ToLocalTime() >= InicioSemanaAtual);
+    private int NecessidadesAbertasSemanaAnterior => Necessidades.Count(n =>
+        n.DataCriacao.ToLocalTime() >= InicioSemanaAnterior &&
+        n.DataCriacao.ToLocalTime() < InicioSemanaAtual);
+    private int TarefasCriadasSemanaAtual => Tarefas.Count(t => t.DataCriacao.ToLocalTime() >= InicioSemanaAtual);
+    private int TarefasCriadasSemanaAnterior => Tarefas.Count(t =>
+        t.DataCriacao.ToLocalTime() >= InicioSemanaAnterior &&
+        t.DataCriacao.ToLocalTime() < InicioSemanaAtual);
+    private int TarefasVencendoHoje => Tarefas.Count(t =>
+        t.Status is "Aberta" or "Em Andamento" &&
+        t.DataLimite.ToLocalTime().Date == HojeLocal);
+    private int TarefasNasProximas48h => Tarefas.Count(t =>
+        t.Status is "Aberta" or "Em Andamento" &&
+        t.DataLimite.ToLocalTime() > DateTime.Now &&
+        t.DataLimite.ToLocalTime() <= DateTime.Now.AddHours(48));
+
+    private string PercentualConclusaoTarefas =>
+        Tarefas.Count == 0 ? "0" : Math.Round((decimal)TarefasFechadas / Tarefas.Count * 100m, 0).ToString("0");
+
+    private string MediaSatisfacaoTexto
     {
-        barConfig = new BarConfig
+        get
         {
-            Options = new BarOptions
+            var notas = Necessidades
+                .SelectMany(n => new[] { n.NotaSatisfacaoColaborador, n.NotaSatisfacaoRH })
+                .Where(n => n is > 0)
+                .Select(n => n!.Value)
+                .ToList();
+
+            return notas.Count == 0 ? "--" : notas.Average().ToString("0.0");
+        }
+    }
+
+    private string ComparativoNecessidadesSemana =>
+        FormatarComparativoSimples(NecessidadesAbertasSemanaAtual, NecessidadesAbertasSemanaAnterior, "vs semana anterior");
+
+    private string ComparativoTarefasSemana =>
+        FormatarComparativoSimples(TarefasCriadasSemanaAtual, TarefasCriadasSemanaAnterior, "vs semana anterior");
+
+    private IReadOnlyList<DashboardMetric> TarefasPorStatus =>
+        BuildStatusMetrics(
+            new[]
             {
-                Responsive = true,
-                Title = new OptionsTitle { Display = true, Text = "Necessidades por Tipo" }
-            }
-        };
+                ("Aberta", "dashboard-bar__fill--open"),
+                ("Em Andamento", "dashboard-bar__fill--progress"),
+                ("Fechada", "dashboard-bar__fill--closed"),
+                ("Cancelada", "dashboard-bar__fill--cancelled")
+            },
+            Tarefas.Select(t => t.Status).ToList());
 
-        foreach (var item in necessidadesPorTipo)
-            barConfig.Data.Labels.Add(item.Tipo);
+    private IReadOnlyList<DashboardMetric> NecessidadesPorStatus =>
+        BuildStatusMetrics(
+            new[]
+            {
+                ("Aberta", "dashboard-bar__fill--open"),
+                ("Fechada", "dashboard-bar__fill--closed"),
+                ("Cancelada", "dashboard-bar__fill--cancelled")
+            },
+            Necessidades.Select(n => n.Status).ToList());
 
-        var dataset = new BarDataset<int>(necessidadesPorTipo.Select(x => x.Total).ToList())
-        {
-            Label = "Quantidade",
-            BackgroundColor = new IndexableOption<string>(
-                necessidadesPorTipo.Select(_ => ColorUtil.RandomColorString()).ToArray()
-            )
-        };
+    private IReadOnlyList<DashboardMetric> NecessidadesPorPrioridade =>
+        Necessidades
+            .Where(n => n.Status == "Aberta")
+            .GroupBy(n => n.Prioridade)
+            .OrderBy(g => g.Key)
+            .Select(g => new DashboardMetric(
+                Label: $"Prioridade {g.Key}",
+                Count: g.Count(),
+                Percentage: 0,
+                CssClass: string.Empty,
+                Subtitle: ObterDescricaoPrioridade(g.Key)))
+            .ToList();
 
-        barConfig.Data.Datasets.Add(dataset);
-    }
-
-    public class NecessidadesPorTipoResponse
+    private IReadOnlyList<DashboardMetric> CargaPorResponsavel
     {
-        public string Tipo { get; set; } = "";
-        public int Total { get; set; }
+        get
+        {
+            var tarefasAbertas = Tarefas.Where(t => t.Status is "Aberta" or "Em Andamento").ToList();
+            if (tarefasAbertas.Count == 0)
+            {
+                return Array.Empty<DashboardMetric>();
+            }
+
+            var total = tarefasAbertas.Count;
+
+            return tarefasAbertas
+                .GroupBy(t => ObterNomeResponsavel(t.UsuarioResponsavelId))
+                .OrderByDescending(g => g.Count())
+                .Take(5)
+                .Select(g => new DashboardMetric(
+                    Label: g.Key,
+                    Count: g.Count(),
+                    Percentage: CalcularPercentual(g.Count(), total),
+                    CssClass: "dashboard-bar__fill--neutral",
+                    Subtitle: $"{CalcularPercentual(g.Count(), total):0}% da carga ativa"))
+                .ToList();
+        }
     }
+
+    private IReadOnlyList<DashboardTrendMetric> RadarSemanal =>
+    [
+        BuildTrendMetric("Necessidades abertas", NecessidadesAbertasSemanaAtual, NecessidadesAbertasSemanaAnterior, invertDirection: true),
+        BuildTrendMetric("Tarefas criadas", TarefasCriadasSemanaAtual, TarefasCriadasSemanaAnterior, invertDirection: true),
+        BuildTrendMetric("Atrasos ativos", TarefasAtrasadas, Tarefas.Count(t => t.Status is "Aberta" or "Em Andamento" && t.DataLimite.ToLocalTime() < InicioSemanaAtual), invertDirection: true),
+        BuildTrendMetric("Satisfacao registrada", TotalAvaliacoes, 0, invertDirection: false)
+    ];
+
+    private IReadOnlyList<DashboardHeroSignal> HeroSignals =>
+    [
+        new("Backlog critico", NecessidadesCriticas.ToString(), NecessidadesCriticas > 0 ? "Demandas sensiveis agora" : "Sem concentracao critica", NecessidadesCriticas > 0 ? "is-critical" : "is-stable"),
+        new("Vencem hoje", TarefasVencendoHoje.ToString(), TarefasVencendoHoje > 0 ? "Pede resposta imediata" : "Agenda controlada", TarefasVencendoHoje > 0 ? "is-focus" : "is-stable"),
+        new("Alertas do dia", (ResumoOperacao?.TotalAlertasHoje ?? 0).ToString(), (ResumoOperacao?.TotalAlertasHoje ?? 0) > 0 ? "Atencao ativa na fila" : "Sem alertas recentes", (ResumoOperacao?.TotalAlertasHoje ?? 0) > 0 ? "is-warm" : "is-stable"),
+        new("Experiencia", MediaSatisfacaoTexto, TotalAvaliacoes > 0 ? $"{TotalAvaliacoes} retorno(s) coletados" : "Base ainda em construcao", TotalAvaliacoes > 0 ? "is-success" : "is-stable")
+    ];
+
+    private IReadOnlyList<DashboardMetric> TopTiposNecessidade
+    {
+        get
+        {
+            var necessidadesAbertas = Necessidades.Where(n => n.Status == "Aberta").ToList();
+            if (necessidadesAbertas.Count == 0)
+            {
+                return Array.Empty<DashboardMetric>();
+            }
+
+            var total = necessidadesAbertas.Count;
+            return necessidadesAbertas
+                .GroupBy(n => ObterNomeTipo(n.TipoNecessidade))
+                .OrderByDescending(g => g.Count())
+                .Take(5)
+                .Select(g => new DashboardMetric(
+                    Label: g.Key,
+                    Count: g.Count(),
+                    Percentage: CalcularPercentual(g.Count(), total),
+                    CssClass: "dashboard-bar__fill--accent",
+                    Subtitle: $"{CalcularPercentual(g.Count(), total):0.#}% da fila aberta"))
+                .ToList();
+        }
+    }
+
+    private IReadOnlyList<TarefaResponse> ProximasEntregas =>
+        Tarefas
+            .Where(t => t.Status is "Aberta" or "Em Andamento")
+            .OrderBy(t => t.DataLimite)
+            .Take(5)
+            .ToList();
+
+    private IReadOnlyList<NecessidadeResponse> BacklogCritico =>
+        Necessidades
+            .Where(n => n.Status == "Aberta")
+            .OrderBy(n => n.Prioridade)
+            .ThenByDescending(n => n.Complexidade)
+            .Take(5)
+            .ToList();
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            UsuarioEmail = await SessionService.GetUserEmailAsync();
+            if (string.IsNullOrWhiteSpace(UsuarioEmail))
+            {
+                Navigation.NavigateTo("/login", true);
+                return;
+            }
+
+            var usuarioTask = ApiService.GetUsuarioInfo(UsuarioEmail);
+            var colaboradorTask = ApiService.GetColaboradorInfo(UsuarioEmail);
+            var empresasTask = ApiService.GetEmpresasAsync(UsuarioEmail);
+            var tarefasTask = ApiService.GetTarefasPainel(UsuarioEmail);
+            var necessidadesTask = ApiService.GetNecessidadesPainel(UsuarioEmail);
+            var tiposTask = ApiService.GetTiposNecessidade(UsuarioEmail);
+            var resumoTask = ApiService.GetResumoOperacao(UsuarioEmail);
+
+            await Task.WhenAll(usuarioTask, colaboradorTask, empresasTask, tarefasTask, necessidadesTask, tiposTask, resumoTask);
+
+            Usuario = usuarioTask.Result ?? new UsuarioResponse { Email = UsuarioEmail };
+            Colaborador = colaboradorTask.Result;
+            Tarefas = tarefasTask.Result ?? new();
+            Necessidades = necessidadesTask.Result ?? new();
+            TiposNecessidade = tiposTask.Result ?? new();
+            ResumoOperacao = resumoTask.Result;
+
+            var empresas = empresasTask.Result ?? new();
+            EmpresaAtual = Colaborador is null
+                ? empresas.FirstOrDefault()
+                : empresas.FirstOrDefault(e => e.EmpresaId == Colaborador.EmpresaId) ?? empresas.FirstOrDefault();
+
+            if (EmpresaAtual?.DataInicioDemo is not null)
+            {
+                var diasAtivos = (DateTime.UtcNow - EmpresaAtual.DataInicioDemo.Value).TotalDays;
+                if (diasAtivos > 30)
+                {
+                    Navigation.NavigateTo("/expirado", true);
+                    return;
+                }
+            }
+
+            if (EmpresaAtual is not null)
+            {
+                Colaboradores = await ApiService.GetColaboradoresAsync(EmpresaAtual.EmpresaId) ?? new();
+            }
+
+            NotificationService.Info("Dashboard carregado com sucesso.");
+        }
+        catch
+        {
+            MensagemErro = "Nao foi possivel carregar o dashboard agora.";
+        }
+        finally
+        {
+            Carregando = false;
+        }
+    }
+
+    private IReadOnlyList<DashboardMetric> BuildStatusMetrics(
+        IEnumerable<(string Label, string CssClass)> statusOrder,
+        IReadOnlyCollection<string> values)
+    {
+        var total = values.Count;
+
+        return statusOrder
+            .Select(status =>
+            {
+                var count = values.Count(v => v == status.Label);
+                return new DashboardMetric(
+                    Label: status.Label,
+                    Count: count,
+                    Percentage: CalcularPercentual(count, total),
+                    CssClass: status.CssClass,
+                    Subtitle: string.Empty);
+            })
+            .ToList();
+    }
+
+    private string ObterNomeResponsavel(int? responsavelId)
+    {
+        var nomeDireto = Tarefas
+            .FirstOrDefault(t => t.UsuarioResponsavelId == responsavelId && !string.IsNullOrWhiteSpace(t.ResponsavelNome))
+            ?.ResponsavelNome;
+
+        if (!string.IsNullOrWhiteSpace(nomeDireto))
+        {
+            return nomeDireto;
+        }
+
+        if (!responsavelId.HasValue)
+        {
+            return "Nao atribuido";
+        }
+
+        return Colaboradores.FirstOrDefault(c => c.Id == responsavelId.Value)?.Nome ?? $"Responsavel #{responsavelId.Value}";
+    }
+
+    private string ObterNomeTipo(int tipoId) =>
+        Necessidades.FirstOrDefault(n => n.TipoNecessidade == tipoId && !string.IsNullOrWhiteSpace(n.TipoNome))?.TipoNome
+        ?? TiposNecessidade.FirstOrDefault(t => t.Id == tipoId)?.Nome
+        ?? "Tipo nao identificado";
+
+    private string ObterNomeExibicao()
+    {
+        if (!string.IsNullOrWhiteSpace(Colaborador?.Nome))
+        {
+            return Colaborador.Nome.Split(' ', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? Colaborador.Nome;
+        }
+
+        if (!string.IsNullOrWhiteSpace(Usuario?.Email))
+        {
+            var localPart = Usuario.Email.Split('@')[0]
+                .Replace(".", " ")
+                .Replace("_", " ")
+                .Replace("-", " ");
+
+            return System.Globalization.CultureInfo.GetCultureInfo("pt-BR").TextInfo.ToTitleCase(localPart.Trim());
+        }
+
+        return string.Empty;
+    }
+
+    private static string ObterDescricaoPrioridade(int prioridade) => prioridade switch
+    {
+        1 => "Imediato",
+        2 => "Mesmo dia",
+        3 => "Em ate 2 dias",
+        4 => "Na semana",
+        5 => "Em 15 dias",
+        6 => "Em 30 dias",
+        _ => "Nao classificada"
+    };
+
+    private static decimal CalcularPercentual(int valor, int total) =>
+        total == 0 ? 0 : Math.Round((decimal)valor / total * 100m, 1);
+
+    private static bool TarefaAtrasada(TarefaResponse tarefa) =>
+        tarefa.Status is "Aberta" or "Em Andamento" && tarefa.DataLimite.ToLocalTime() < DateTime.Now;
+
+    private static string FormatarComparativoSimples(int atual, int anterior, string contexto)
+    {
+        if (anterior == 0)
+        {
+            return atual == 0 ? $"Sem movimento {contexto}" : $"Novo volume {contexto}";
+        }
+
+        var delta = atual - anterior;
+        var prefixo = delta == 0 ? "Estavel" : delta > 0 ? $"+{delta}" : delta.ToString();
+        return $"{prefixo} {contexto}";
+    }
+
+    private static DashboardTrendMetric BuildTrendMetric(string label, int current, int previous, bool invertDirection)
+    {
+        var delta = current - previous;
+        var neutral = delta == 0;
+        var positive = invertDirection ? delta <= 0 : delta >= 0;
+        var directionCss = neutral ? "dashboard-trend-badge--neutral" : positive ? "dashboard-trend-badge--positive" : "dashboard-trend-badge--negative";
+        var comparisonText = previous == 0
+            ? (current == 0 ? "Estavel" : "Nova base")
+            : $"{(delta > 0 ? "+" : string.Empty)}{delta} vs anterior";
+
+        return new DashboardTrendMetric(label, current, previous, comparisonText, directionCss);
+    }
+
+    private sealed record DashboardMetric(string Label, int Count, decimal Percentage, string CssClass, string Subtitle);
+    private sealed record DashboardTrendMetric(string Label, int Current, int Previous, string ComparisonText, string DirectionCss);
+    private sealed record DashboardHeroSignal(string Label, string Value, string SupportingText, string CssClass);
 }

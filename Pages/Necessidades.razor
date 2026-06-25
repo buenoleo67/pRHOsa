@@ -1,396 +1,601 @@
-﻿@page "/Necessidades"
+@page "/Necessidades"
 @inject API ApiService
-@inject Blazored.LocalStorage.ILocalStorageService LocalStorage
+@inject SessionService SessionService
 @inject NavigationManager Navigation
-@using pRHosaApp1.Models
+@inject NotificationService NotificationService
 
-<link href="css/necessidades.css" rel="stylesheet" />
+<AuthGuard>
+    <AppShell Title="Necessidades" Subtitle="Organize a fila de demandas do RH, distribua prioridade com clareza e acompanhe alertas, satisfacao e fechamento.">
+        <link href="css/necessidades.css" rel="stylesheet" />
 
-<div class="page-container">
-    <h3 class="mb-4">📌 Minhas Necessidades</h3>
-
-    @if (Carregando)
-    {
-        <div class="alert alert-info">Carregando necessidades...</div>
-    }
-    else if (ListaNecessidades.Count == 0)
-    {
-        <div class="alert alert-warning">Nenhuma necessidade encontrada.</div>
-    }
-
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <button class="btn btn-primary" @onclick="() => ExibirFormulario = !ExibirFormulario">
-            @(ExibirFormulario ? "Fechar" : "+ Nova Necessidade")
-        </button>
-        <button class="btn btn-info" @onclick="IrParaTarefas">Tarefas</button>
-    </div>
-
-    @if (ExibirFormulario)
-    {
-        <div class="form-necessidade">
-            <h5>Nova Necessidade</h5>
-
-            <div class="mb-2">
-                <label>Título:</label>
-                <input class="form-control" @bind="NovaNecessidade.Titulo" />
-            </div>
-
-            <div class="mb-2">
-                <label>Tipo de Necessidade:</label>
-                <select class="form-select" @bind="NovaNecessidade.TipoNecessidade">
-                    <option value="">-- Selecione --</option>
-                    @foreach (var tipo in TiposNecessidade)
-                    {
-                        <option value="@tipo.Id">@tipo.Nome</option>
-                    }
-                </select>
-            </div>
-
-
-            @if (Colaborador?.TipoUsuario is 1 or 4)
+        <div class="page-container">
+            @if (!string.IsNullOrEmpty(MensagemOperacao))
             {
-                <div class="mb-2">
-                    <label>Prioridade:</label>
-                    <select class="form-select" @bind="NovaNecessidade.Prioridade">
-                        <option value="1">1 - Imediato</option>
-                        <option value="2">2 - Mesmo dia</option>
-                        <option value="3">3 - Em até 2 dias</option>
-                        <option value="4">4 - Na semana</option>
-                        <option value="5">5 - Em 15 dias</option>
-                        <option value="6">6 - Em 30 dias</option>
-                    </select>
-                </div>
-
-                <div class="mb-2">
-                    <label>Complexidade:</label>
-                    <select class="form-select" @bind="NovaNecessidade.Complexidade">
-                        <option value="7">7 - Nenhuma</option>
-                        <option value="8">8 - Baixa</option>
-                        <option value="9">9 - Média</option>
-                        <option value="10">10 - Alta</option>
-                    </select>
-                </div>
+                <div class="alert @ClasseMensagemOperacao">@MensagemOperacao</div>
             }
 
-            <div class="mb-3">
-                <label>Descrição:</label>
-                <textarea class="form-control" @bind="NovaNecessidade.Descricao"></textarea>
+            @if (Carregando)
+            {
+                <div class="alert alert-info">Carregando necessidades...</div>
+            }
+            else if (ListaNecessidades.Count == 0)
+            {
+                <div class="alert alert-warning">Nenhuma necessidade encontrada.</div>
+            }
+
+            <div class="workspace-toolbar mb-3">
+                <div class="workspace-toolbar__copy">
+                    <span class="workspace-toolbar__eyebrow">Fluxo operacional</span>
+                    <h3>Fila de necessidades</h3>
+                </div>
+                <div class="workspace-toolbar__actions">
+                    <button class="btn btn-primary" @onclick="AbrirFormulario">+ Nova Necessidade</button>
+                    <button class="btn btn-info" @onclick="IrParaTarefas">Ver tarefas</button>
+                </div>
             </div>
 
-            <button class="btn btn-success w-100" @onclick="CadastrarNecessidade">
-                💾 Salvar Necessidade
-            </button>
-        </div>
-    }
+            <p class="queue-helper-text">Use o botao <strong>Abrir detalhes</strong> em cada card para acompanhar alertas, prioridade e fechamento sem depender de clique escondido.</p>
 
-    @if (!Carregando && ListaNecessidades.Count > 0)
-    {
-        <div class="kanban-board">
-            @foreach (var status in new[] { "Aberta", "Fechada", "Cancelada" })
+            @if (!Carregando && ListaNecessidades.Count > 0)
             {
-                <div class="kanban-column">
-                    <h5>@status</h5>
+                <div class="queue-summary-grid">
+                    <article class="queue-summary-card">
+                        <span>Abertas</span>
+                        <strong>@ListaNecessidades.Count(n => n.Status == "Aberta")</strong>
+                        <small>Demandas ativas na fila</small>
+                    </article>
+                    <article class="queue-summary-card">
+                        <span>Criticas</span>
+                        <strong>@ListaNecessidades.Count(n => NecessidadeCritica(n))</strong>
+                        <small>Prioridade imediata</small>
+                    </article>
+                    <article class="queue-summary-card">
+                        <span>Com alerta</span>
+                        <strong>@ListaNecessidades.Count(n => n.TotalAlertas > 0 && n.Status == "Aberta")</strong>
+                        <small>Precisam de interacao</small>
+                    </article>
+                    <article class="queue-summary-card">
+                        <span>Com tarefa aberta</span>
+                        <strong>@ListaNecessidades.Count(n => n.TotalTarefasAbertas > 0)</strong>
+                        <small>Ja estao em tratativa</small>
+                    </article>
+                </div>
 
-                    @foreach (var necessidade in ListaNecessidades.Where(n => n.Status == status))
+                <div class="queue-filter-bar">
+                    @foreach (var filtro in FiltrosNecessidade)
                     {
-                        <div class="kanban-card @ObterClassePorStatus(necessidade.Status)">
-                            <div class="d-flex justify-content-between align-items-center" @onclick="() => ToggleExpandirNecessidade(necessidade.Id)" style="cursor:pointer;">
-                                <div>
-                                    <strong>@necessidade.Titulo</strong>
-                                    <div class="small text-muted">Tipo: @ObterNomeTipo(necessidade.TipoNecessidade)</div>
-                                    <div class="small text-muted">Priorização: @necessidade.Prioridade</div>
-                                </div>
+                        <button class="queue-filter @(FiltroAtivo == filtro ? "queue-filter--active" : "")"
+                                @onclick="() => SelecionarFiltro(filtro)">
+                            @filtro
+                        </button>
+                    }
+                </div>
 
-                                @if (necessidade.Alertas != null && necessidade.Alertas.Any())
-                                {
-                                    <span title="Possui alertas" class="text-warning fs-4">
-                                        <i class="bi bi-bell-fill"></i>
-                                    </span>
-                                }
-                                <span class="badge-status">@necessidade.Status</span>
-                            </div>
+                <div class="kanban-board">
+                    @foreach (var status in StatusVisiveis)
+                    {
+                        <div class="kanban-column">
+                            <h5>@status</h5>
 
-                            @if (NecessidadeExpandidaId == necessidade.Id)
+                            @foreach (var necessidade in NecessidadesFiltradas.Where(n => n.Status == status))
                             {
-                                <div class="necessidade-detalhes mt-3 border-top pt-2">
-                                    <p><b>Descrição:</b> @necessidade.Descricao</p>
-
-
-                                    @if ((Colaborador?.TipoUsuario is 1 or 4) && (necessidade.Status != "Fechada" && necessidade.Status != "Cancelada"))
-                                    {
-                                        <div class="mb-2 mt-3">
-                                            <label>Alterar Prioridade:</label>
-                                            <select class="form-select" @onchange="e => OnChangePrioridade(e, necessidade.Id)" value="@necessidade.Prioridade">
-                                                <option value="1">1 - Imediato</option>
-                                                <option value="2">2 - Mesmo dia</option>
-                                                <option value="3">3 - Em até 2 dias</option>
-                                                <option value="4">4 - Na semana</option>
-                                                <option value="5">5 - Em 15 dias</option>
-                                                <option value="6">6 - Em 30 dias</option>
-                                            </select>
+                                <div class="kanban-card @ObterClassePorStatus(necessidade.Status)">
+                                    <div class="kanban-card__header">
+                                        <div class="kanban-card__summary" @onclick="() => ToggleExpandirNecessidadeAsync(necessidade.Id)">
+                                            <strong>@necessidade.Titulo</strong>
+                                            <div class="small text-muted">Tipo: @ObterNomeTipo(necessidade.TipoNecessidade)</div>
+                                            <div class="small text-muted">Priorizacao: @ObterDescricaoPrioridade(necessidade.Prioridade)</div>
+                                            <div class="small text-muted">Responsavel: @ObterResponsavelNecessidade(necessidade)</div>
                                         </div>
 
-                                        <div class="mb-2">
-                                            <label>Alterar Complexidade:</label>
-                                            <select class="form-select" @onchange="e => OnChangeComplexidade(e, necessidade.Id)" value="@necessidade.Complexidade">
-                                                <option value="7">7 - Nenhuma</option>
-                                                <option value="8">8 - Baixa</option>
-                                                <option value="9">9 - Média</option>
-                                                <option value="10">10 - Alta</option>
-                                            </select>
-                                        </div>
-                                    }
-                                    else if (necessidade.Status != "Fechada" && necessidade.Status != "Cancelada")
-                                    {
-                                        @* Alertas *@
-                                        <div class="alerta-box mt-3">
-                                            <h6>🔔 Alertas</h6>
+                                        <div class="kanban-card__meta">
+                                            <button type="button"
+                                                    class="btn btn-sm btn-outline-primary queue-inline-action"
+                                                    @onclick="() => ToggleExpandirNecessidadeAsync(necessidade.Id)">
+                                                @(NecessidadeExpandidaId == necessidade.Id ? "Ocultar detalhes" : "Abrir detalhes")
+                                            </button>
 
-                                            @if (necessidade.Alertas?.Any() == true)
+                                            @if (necessidade.TotalAlertas > 0)
                                             {
-                                                <ul class="alerta-list">
-                                                    @foreach (var alerta in necessidade.Alertas)
+                                                <span title="Possui alertas" class="badge-status badge-status--warning">@necessidade.TotalAlertas alerta(s)</span>
+                                            }
+
+                                            @if (NecessidadeCritica(necessidade))
+                                            {
+                                                <span class="badge-status badge-status--danger">Critica</span>
+                                            }
+
+                                            <span class="badge-status">@necessidade.Status</span>
+                                        </div>
+                                    </div>
+
+                                    <div class="kanban-card__details">
+                                        <span>@(necessidade.TotalTarefasAbertas > 0 ? $"{necessidade.TotalTarefasAbertas} tarefa(s) abertas" : "Sem tarefa ativa")</span>
+                                        <span>@ObterPrazoNecessidade(necessidade)</span>
+                                    </div>
+
+                                    @if (NecessidadeExpandidaId == necessidade.Id)
+                                    {
+                                        <div class="necessidade-detalhes mt-3 border-top pt-2">
+                                            <p><b>Descricao:</b> @necessidade.Descricao</p>
+                                            <div class="queue-detail-grid">
+                                                <div><b>Data de abertura:</b> @necessidade.DataCriacao.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</div>
+                                                <div><b>Tipo:</b> @ObterNomeTipo(necessidade.TipoNecessidade)</div>
+                                                <div><b>Responsavel atual:</b> @ObterResponsavelNecessidade(necessidade)</div>
+                                                <div><b>Proximo prazo:</b> @ObterPrazoNecessidade(necessidade)</div>
+                                            </div>
+
+                                            @if ((Colaborador?.TipoUsuario is 1 or 4) && NecessidadePermiteEdicao(necessidade))
+                                            {
+                                                <div class="mb-2 mt-3">
+                                                    <label>Alterar prioridade</label>
+                                                    <select class="form-select" @onchange="e => OnChangePrioridade(e, necessidade.Id)" value="@necessidade.Prioridade">
+                                                        @foreach (var prioridade in Prioridades)
+                                                        {
+                                                            <option value="@prioridade.Key">@prioridade.Value</option>
+                                                        }
+                                                    </select>
+                                                </div>
+
+                                                <div class="mb-2">
+                                                    <label>Alterar complexidade</label>
+                                                    <select class="form-select" @onchange="e => OnChangeComplexidade(e, necessidade.Id)" value="@necessidade.Complexidade">
+                                                        @foreach (var complexidade in Complexidades)
+                                                        {
+                                                            <option value="@complexidade.Key">@complexidade.Value</option>
+                                                        }
+                                                    </select>
+                                                </div>
+                                            }
+                                            else if (NecessidadePermiteEdicao(necessidade))
+                                            {
+                                                <div class="alerta-box mt-3">
+                                                    <h6>Alertas</h6>
+
+                                                    @if (necessidade.Alertas.Any())
                                                     {
-                                                        <li>
-                                                            <div>
-                                                                <strong>@alerta.Autor</strong>
-                                                                <span class="text-muted small"> em @alerta.DataCriacao.ToString("dd/MM/yyyy HH:mm")</span>
-                                                            </div>
-                                                            <div>@alerta.Mensagem</div>
-                                                        </li>
+                                                        <ul class="alerta-list">
+                                                            @foreach (var alerta in necessidade.Alertas.OrderByDescending(a => a.DataCriacao))
+                                                            {
+                                                                <li>
+                                                                    <div>
+                                                                        <strong>@alerta.Autor</strong>
+                                                                        <span class="text-muted small"> em @alerta.DataCriacao.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</span>
+                                                                    </div>
+                                                                    <div>@alerta.Mensagem</div>
+                                                                </li>
+                                                            }
+                                                        </ul>
                                                     }
-                                                </ul>
+                                                    else
+                                                    {
+                                                        <div class="text-muted fst-italic">Nenhum alerta enviado.</div>
+                                                    }
+
+                                                    <div class="mt-2">
+                                                        <textarea class="form-control"
+                                                                  placeholder="Escreva um alerta..."
+                                                                  value="@ObterTextoAlerta(necessidade.Id)"
+                                                                  @oninput="e => AtualizarTextoAlerta(necessidade.Id, e.Value?.ToString())"></textarea>
+                                                        <button class="btn btn-info mt-2" @onclick="() => EnviarAlerta(necessidade.Id)">Enviar alerta</button>
+                                                    </div>
+                                                </div>
                                             }
                                             else
                                             {
-                                                <div class="text-muted fst-italic">Nenhum alerta enviado.</div>
+                                                <div class="alert alert-secondary small">
+                                                    Edicao desativada: esta necessidade esta @necessidade.Status.ToUpper().
+                                                </div>
+
+                                                @if (Colaborador?.TipoUsuario == 3)
+                                                {
+                                                    <div class="mt-3">
+                                                        <label>Sua avaliacao</label>
+                                                        @if (necessidade.NotaSatisfacaoColaborador is null or 0)
+                                                        {
+                                                            <select class="form-select w-50" @onchange="e => OnChangeNotaColaborador(e, necessidade.Id)">
+                                                                <option value="">Selecione</option>
+                                                                @for (var i = 1; i <= 5; i++)
+                                                                {
+                                                                    <option value="@i">@i estrela(s)</option>
+                                                                }
+                                                            </select>
+                                                        }
+                                                        else
+                                                        {
+                                                            <div class="alert alert-success small mt-1">
+                                                                Sua nota: <b>@necessidade.NotaSatisfacaoColaborador</b>
+                                                            </div>
+                                                        }
+                                                    </div>
+                                                }
+                                                else if (Colaborador?.TipoUsuario is 1 or 4)
+                                                {
+                                                    <div class="mt-3">
+                                                        <label>Sua avaliacao (RH)</label>
+                                                        @if (necessidade.NotaSatisfacaoRH is null or 0)
+                                                        {
+                                                            <select class="form-select w-50" @onchange="e => OnChangeNotaRh(e, necessidade.Id)">
+                                                                <option value="">Selecione</option>
+                                                                @for (var i = 1; i <= 5; i++)
+                                                                {
+                                                                    <option value="@i">@i estrela(s)</option>
+                                                                }
+                                                            </select>
+                                                        }
+                                                        else
+                                                        {
+                                                            <div class="alert alert-success small mt-1">
+                                                                Sua nota: <b>@necessidade.NotaSatisfacaoRH</b>
+                                                            </div>
+                                                        }
+                                                    </div>
+                                                }
                                             }
-
-                                            <div class="mt-2">
-                                                <textarea class="form-control" placeholder="Escreva um alerta..." @bind="NovoAlerta"></textarea>
-                                                <button class="btn btn-info mt-2" @onclick="() => EnviarAlerta(necessidade.Id)">🚀 Enviar Alerta</button>
-                                            </div>
                                         </div>
                                     }
-                                    else if (necessidade.Status is "Fechada" or "Cancelada")
-                                    {
-                                        <div class="alert alert-secondary small">
-                                            Edição desativada: esta necessidade está <b>@necessidade.Status.ToUpper()</b>.
-                                        </div>
-                                        @if (Colaborador?.TipoUsuario == 3)  @* Colaborador *@
-                                        {
-                                            <div class="mt-3">
-                                                <label>Sua Avaliação:</label>
-                                                @if (necessidade.NotaSatisfacaoColaborador == null || necessidade.NotaSatisfacaoColaborador == 0)
-                                                {
-                                                    <select class="form-select w-50"
-                                                            @onchange="e => AvaliarColaborador(necessidade.Id, int.Parse(e.Value.ToString()))">
-                                                        <option value="">Selecione</option>
-                                                        @for (int i = 1; i <= 5; i++)
-                                                        {
-                                                            <option value="@i">@i ⭐</option>
-                                                        }
-                                                    </select>
-                                                }
-                                                else
-                                                {
-                                                    <div class="alert alert-success small mt-1">
-                                                        Sua nota: <b>@necessidade.NotaSatisfacaoColaborador</b>
-                                                    </div>
-                                                }
-                                            </div>
-
-                                        }
-                                        else if (Colaborador?.TipoUsuario is 1 or 4) @* RH ou Diretoria *@
-                                        {
-                                            <div class="mt-3">
-                                                <label>Sua Avaliação (RH):</label>
-                                                @if (necessidade.NotaSatisfacaoRH == null || necessidade.NotaSatisfacaoRH == 0)
-                                                {
-                                                    <select class="form-select w-50"
-                                                            @onchange="e => AvaliarRH(necessidade.Id, int.Parse(e.Value.ToString()))">
-                                                        <option value="">Selecione</option>
-                                                        @for (int i = 1; i <= 5; i++)
-                                                        {
-                                                            <option value="@i">@i ⭐</option>
-                                                        }
-                                                    </select>
-                                                }
-                                                else
-                                                {
-                                                    <div class="alert alert-success small mt-1">
-                                                        Sua nota: <b>@necessidade.NotaSatisfacaoRH</b>
-                                                    </div>
-                                                }
-                                            </div>
-                                        }
-                                    }
-
                                 </div>
                             }
-                        </div>
-                    }
 
-                    @if (!ListaNecessidades.Any(n => n.Status == status))
-                    {
-                        <div class="text-center text-muted fst-italic">Nenhuma necessidade @status.</div>
+                            @if (!NecessidadesFiltradas.Any(n => n.Status == status))
+                            {
+                                <div class="text-center text-muted fst-italic">Nenhuma necessidade @status.ToLower().</div>
+                            }
+                        </div>
                     }
                 </div>
             }
         </div>
-    }
 
-    @if (ExibirMensagemSucesso)
-    {
-        <div class="alert alert-success alert-dismissible fade show position-fixed top-0 end-0 m-3 shadow" role="alert">
-            @MensagemSucesso
-            <button type="button" class="btn-close" @onclick="() => ExibirMensagemSucesso = false"></button>
-        </div>
-    }
-</div>
+        <ActionDrawer IsOpen="ExibirFormulario"
+                      Title="Nova necessidade"
+                      Subtitle="Abra uma nova demanda com prioridade, complexidade e classificacao alinhadas ao time."
+                      OnClose="FecharFormulario">
+            <div class="drawer-form-grid">
+                <div>
+                    <label>Titulo</label>
+                    <input class="form-control" @bind="NovaNecessidade.Titulo" />
+                </div>
+
+                <div>
+                    <label>Tipo de necessidade</label>
+                    <select class="form-select" @bind="NovaNecessidade.TipoNecessidade">
+                        <option value="">-- Selecione --</option>
+                        @foreach (var tipo in TiposNecessidade)
+                        {
+                            <option value="@tipo.Id">@tipo.Nome</option>
+                        }
+                    </select>
+                </div>
+
+                @if (Colaborador?.TipoUsuario is 1 or 4)
+                {
+                    <div>
+                        <label>Prioridade</label>
+                        <select class="form-select" @bind="NovaNecessidade.Prioridade">
+                            @foreach (var prioridade in Prioridades)
+                            {
+                                <option value="@prioridade.Key">@prioridade.Value</option>
+                            }
+                        </select>
+                    </div>
+
+                    <div>
+                        <label>Complexidade</label>
+                        <select class="form-select" @bind="NovaNecessidade.Complexidade">
+                            @foreach (var complexidade in Complexidades)
+                            {
+                                <option value="@complexidade.Key">@complexidade.Value</option>
+                            }
+                        </select>
+                    </div>
+                }
+            </div>
+
+            <div class="mt-3">
+                <label>Descricao</label>
+                <textarea class="form-control drawer-textarea" @bind="NovaNecessidade.Descricao"></textarea>
+            </div>
+
+            <div class="drawer-actions">
+                <button class="btn btn-success" @onclick="CadastrarNecessidade">Salvar necessidade</button>
+            </div>
+        </ActionDrawer>
+    </AppShell>
+</AuthGuard>
 
 @code {
-    private string? MensagemSucesso;
-    private bool ExibirMensagemSucesso = false;
+    private static readonly string[] StatusVisiveis = ["Aberta", "Fechada", "Cancelada"];
+    private static readonly string[] FiltrosNecessidade = ["Todas", "Criticas", "Com alerta", "Em tratativa", "Finalizadas"];
+
+    private static readonly Dictionary<int, string> Prioridades = new()
+    {
+        [1] = "1 - Imediato",
+        [2] = "2 - Mesmo dia",
+        [3] = "3 - Em ate 2 dias",
+        [4] = "4 - Na semana",
+        [5] = "5 - Em 15 dias",
+        [6] = "6 - Em 30 dias"
+    };
+
+    private static readonly Dictionary<int, string> Complexidades = new()
+    {
+        [7] = "7 - Nenhuma",
+        [8] = "8 - Baixa",
+        [9] = "9 - Media",
+        [10] = "10 - Alta"
+    };
+
     private bool Carregando = true;
-    private bool ExibirFormulario = false;
-    private int? NecessidadeExpandidaId = null;
+    private bool ExibirFormulario;
+    private int? NecessidadeExpandidaId;
+    private string FiltroAtivo = "Todas";
     private string? UsuarioEmail;
-    private string NovoAlerta = "";
+    private string MensagemOperacao = string.Empty;
+    private string ClasseMensagemOperacao = "alert-info";
+    private readonly Dictionary<int, string> AlertasRascunho = new();
 
     private List<NecessidadeResponse> ListaNecessidades = new();
     private ColaboradorResponse? Colaborador;
     private List<TipoNecessidade> TiposNecessidade = new();
-    private NecessidadeRequest NovaNecessidade = new();
+    private NecessidadeRequest NovaNecessidade = new() { Prioridade = 3, Complexidade = 8 };
+    private Empresa? EmpresaAtual;
+    private IEnumerable<NecessidadeResponse> NecessidadesFiltradas => ListaNecessidades.Where(AplicarFiltro);
 
     protected override async Task OnInitializedAsync()
     {
-        UsuarioEmail = await LocalStorage.GetItemAsync<string>("usuario_email");
-        Colaborador = await ApiService.GetColaboradorInfo(UsuarioEmail);
-
-        if (string.IsNullOrEmpty(UsuarioEmail))
+        UsuarioEmail = await SessionService.GetUserEmailAsync();
+        if (string.IsNullOrWhiteSpace(UsuarioEmail))
         {
             Navigation.NavigateTo("/login", true);
             return;
         }
 
-        TiposNecessidade = await ApiService.GetTiposNecessidade(UsuarioEmail) ?? new();
-        ListaNecessidades = await ApiService.GetNecessidadesUsuario(UsuarioEmail) ?? new();
-        foreach (var necessidade in ListaNecessidades)
+        Colaborador = await ApiService.GetColaboradorInfo(UsuarioEmail);
+        var empresas = await ApiService.GetEmpresasAsync(UsuarioEmail) ?? new();
+        EmpresaAtual = Colaborador is null
+            ? empresas.FirstOrDefault()
+            : empresas.FirstOrDefault(e => e.EmpresaId == Colaborador.EmpresaId) ?? empresas.FirstOrDefault();
+
+        if (EmpresaAtual?.DataInicioDemo is not null)
         {
-            var alertas = await ApiService.ObterAlertasNecessidade(necessidade.Id);
-            necessidade.Alertas = alertas?.ToList() ?? new List<NecessidadeAlerta>();
+            var dias = (DateTime.UtcNow - EmpresaAtual.DataInicioDemo.Value).TotalDays;
+            if (dias > 30)
+            {
+                Navigation.NavigateTo("/expirado", true);
+                return;
+            }
         }
+
+        NovaNecessidade.EmpresaId = EmpresaAtual?.EmpresaId ?? 0;
+        TiposNecessidade = await ApiService.GetTiposNecessidade(UsuarioEmail) ?? new();
+        await CarregarNecessidadesAsync();
+        NotificationService.Info("Fila de necessidades pronta para acompanhamento.");
         Carregando = false;
     }
-    
-    private void IrParaTarefas()
+
+    private void AbrirFormulario()
     {
-        Navigation.NavigateTo("/Tarefas", true);
+        ExibirFormulario = true;
+        MensagemOperacao = string.Empty;
     }
 
-    private string ObterClassePorStatus(string status) => status switch
+    private void FecharFormulario()
+    {
+        ExibirFormulario = false;
+        MensagemOperacao = string.Empty;
+    }
+
+    private void IrParaTarefas()
+    {
+        Navigation.NavigateTo("/Tarefas");
+    }
+
+    private static string ObterClassePorStatus(string status) => status switch
     {
         "Aberta" => "kanban-aberta",
         "Fechada" => "kanban-fechada",
         "Cancelada" => "kanban-cancelada",
         _ => "kanban-padrao"
     };
-    private void ToggleExpandirNecessidade(int id)
-    {
-        NecessidadeExpandidaId = NecessidadeExpandidaId == id ? null : id;
-    }
 
+    private async Task ToggleExpandirNecessidadeAsync(int id)
+    {
+        if (NecessidadeExpandidaId == id)
+        {
+            NecessidadeExpandidaId = null;
+            return;
+        }
+
+        NecessidadeExpandidaId = id;
+
+        var necessidade = ListaNecessidades.FirstOrDefault(n => n.Id == id);
+        if (necessidade is not null)
+        {
+            await GarantirAlertasCarregadosAsync(necessidade);
+        }
+    }
 
     private string ObterNomeTipo(int tipoId) =>
         TiposNecessidade.FirstOrDefault(t => t.Id == tipoId)?.Nome ?? "Desconhecido";
 
+    private string ObterDescricaoPrioridade(int prioridade) =>
+        Prioridades.TryGetValue(prioridade, out var descricao) ? descricao : "Nao definida";
+
     private async Task OnChangePrioridade(ChangeEventArgs e, int necessidadeId)
     {
-        if (int.TryParse(e.Value?.ToString(), out int novaPrioridade))
+        if (!int.TryParse(e.Value?.ToString(), out var novaPrioridade))
         {
-            var sucesso = await ApiService.AtualizarPrioridadeNecessidade(necessidadeId, novaPrioridade);
-            if (sucesso)
-            {
-                var necessidade = ListaNecessidades.FirstOrDefault(n => n.Id == necessidadeId);
-                if (necessidade != null) necessidade.Prioridade = novaPrioridade;
+            return;
+        }
 
-                await ExibirAlertaSucesso("✅ Prioridade atualizada com sucesso!");
+        var sucesso = await ApiService.AtualizarPrioridadeNecessidade(necessidadeId, novaPrioridade);
+        if (sucesso)
+        {
+            var necessidade = ListaNecessidades.FirstOrDefault(n => n.Id == necessidadeId);
+            if (necessidade is not null)
+            {
+                necessidade.Prioridade = novaPrioridade;
             }
+
+            await ExibirAlertaSucesso("Prioridade atualizada com sucesso.");
+            NotificationService.Success("Priorizacao atualizada.");
         }
     }
 
     private async Task OnChangeComplexidade(ChangeEventArgs e, int necessidadeId)
     {
-        if (int.TryParse(e.Value?.ToString(), out int novaComplexidade))
+        if (!int.TryParse(e.Value?.ToString(), out var novaComplexidade))
         {
-            var sucesso = await ApiService.AtualizarComplexidadeNecessidade(necessidadeId, novaComplexidade);
-            if (sucesso)
-            {
-                var necessidade = ListaNecessidades.FirstOrDefault(n => n.Id == necessidadeId);
-                if (necessidade != null) necessidade.Complexidade = novaComplexidade;
+            return;
+        }
 
-                await ExibirAlertaSucesso("✅ Complexidade atualizada com sucesso!");
+        var sucesso = await ApiService.AtualizarComplexidadeNecessidade(necessidadeId, novaComplexidade);
+        if (sucesso)
+        {
+            var necessidade = ListaNecessidades.FirstOrDefault(n => n.Id == necessidadeId);
+            if (necessidade is not null)
+            {
+                necessidade.Complexidade = novaComplexidade;
             }
+
+            await ExibirAlertaSucesso("Complexidade atualizada com sucesso.");
+            NotificationService.Success("Complexidade atualizada.");
         }
     }
 
     private async Task CadastrarNecessidade()
     {
-        var sucesso = await ApiService.PostNecessidade(UsuarioEmail!, NovaNecessidade);
-        if (sucesso)
+        if (string.IsNullOrWhiteSpace(UsuarioEmail))
         {
-            ExibirFormulario = false;
-            NovaNecessidade = new();
-            ListaNecessidades = await ApiService.GetNecessidadesUsuario(UsuarioEmail) ?? new();
+            Navigation.NavigateTo("/login", true);
+            return;
         }
+
+        if (string.IsNullOrWhiteSpace(NovaNecessidade.Titulo) ||
+            string.IsNullOrWhiteSpace(NovaNecessidade.Descricao) ||
+            NovaNecessidade.TipoNecessidade == 0)
+        {
+            DefinirMensagemOperacao("Preencha titulo, descricao e tipo antes de salvar.", "alert-danger");
+            return;
+        }
+
+        NovaNecessidade.EmpresaId = EmpresaAtual?.EmpresaId ?? NovaNecessidade.EmpresaId;
+        var resultado = await ApiService.PostNecessidade(UsuarioEmail, NovaNecessidade);
+        if (resultado == "success")
+        {
+            FecharFormulario();
+            NovaNecessidade = new NecessidadeRequest
+            {
+                EmpresaId = EmpresaAtual?.EmpresaId ?? 0,
+                Prioridade = 3,
+                Complexidade = 8
+            };
+
+            await CarregarNecessidadesAsync();
+            await ExibirAlertaSucesso("Necessidade registrada com sucesso.");
+            NotificationService.Success("Necessidade aberta com sucesso.");
+        }
+        else
+        {
+            DefinirMensagemOperacao(resultado, "alert-danger");
+            NotificationService.Error(resultado);
+        }
+    }
+
+    private async Task CarregarNecessidadesAsync()
+    {
+        if (string.IsNullOrWhiteSpace(UsuarioEmail))
+        {
+            ListaNecessidades = new();
+            return;
+        }
+
+        ListaNecessidades = await ApiService.GetNecessidadesPainel(UsuarioEmail) ?? new();
+    }
+
+    private async Task GarantirAlertasCarregadosAsync(NecessidadeResponse necessidade)
+    {
+        if (necessidade.Alertas.Any() || necessidade.TotalAlertas == 0)
+        {
+            return;
+        }
+
+        var alertas = await ApiService.ObterAlertasNecessidade(necessidade.Id);
+        necessidade.Alertas = alertas.ToList();
     }
 
     private async Task EnviarAlerta(int necessidadeId)
     {
-        if (string.IsNullOrWhiteSpace(NovoAlerta)) return;
+        var texto = ObterTextoAlerta(necessidadeId);
+        if (string.IsNullOrWhiteSpace(texto))
+        {
+            return;
+        }
 
         var necessidade = ListaNecessidades.FirstOrDefault(n => n.Id == necessidadeId);
-        if (necessidade == null) return;
+        if (necessidade is null)
+        {
+            return;
+        }
 
-        // Filtra alertas do mesmo dia
         var hoje = DateTime.Today;
-        var alertasHoje = necessidade.Alertas?.Count(a => a.DataCriacao.Date == hoje) ?? 0;
-
+        var alertasHoje = necessidade.Alertas.Count(a => a.DataCriacao.ToLocalTime().Date == hoje);
         if (alertasHoje >= 2)
         {
-            await ExibirAlertaSucesso("⚠️ Limite de 2 alertas por dia atingido para esta necessidade!");
+            await ExibirAlertaSucesso("Limite de 2 alertas por dia atingido para esta necessidade.");
             return;
         }
 
         var alerta = new NecessidadeAlerta
-            {
-                NecessidadeId = necessidadeId,
-                Mensagem = NovoAlerta,
-                Autor = Colaborador?.Nome ?? UsuarioEmail ?? "Anônimo",
-                DataCriacao = DateTime.Now
-            };
+        {
+            NecessidadeId = necessidadeId,
+            Mensagem = texto.Trim(),
+            Autor = Colaborador?.Nome ?? UsuarioEmail ?? "Anonimo",
+            DataCriacao = DateTime.UtcNow
+        };
 
         var sucesso = await ApiService.PostAlertaNecessidade(alerta);
-
         if (sucesso)
         {
-            necessidade.Alertas ??= new List<NecessidadeAlerta>();
             necessidade.Alertas.Add(alerta);
-
-            NovoAlerta = string.Empty;
-            await ExibirAlertaSucesso("✅ Alerta enviado com sucesso!");
+            AlertasRascunho.Remove(necessidadeId);
+            await ExibirAlertaSucesso("Alerta enviado com sucesso.");
         }
     }
 
+    private string ObterTextoAlerta(int necessidadeId) =>
+        AlertasRascunho.TryGetValue(necessidadeId, out var texto) ? texto : string.Empty;
+
+    private void AtualizarTextoAlerta(int necessidadeId, string? valor)
+    {
+        AlertasRascunho[necessidadeId] = valor ?? string.Empty;
+    }
 
     private async Task ExibirAlertaSucesso(string mensagem)
     {
-        MensagemSucesso = mensagem;
-        ExibirMensagemSucesso = true;
-        await Task.Delay(3000);
-        ExibirMensagemSucesso = false;
-        StateHasChanged();
+        DefinirMensagemOperacao(mensagem, "alert-success");
+        await Task.CompletedTask;
+    }
+
+    private async Task OnChangeNotaColaborador(ChangeEventArgs e, int necessidadeId)
+    {
+        if (!int.TryParse(e.Value?.ToString(), out var nota))
+        {
+            return;
+        }
+
+        await AvaliarColaborador(necessidadeId, nota);
+    }
+
+    private async Task OnChangeNotaRh(ChangeEventArgs e, int necessidadeId)
+    {
+        if (!int.TryParse(e.Value?.ToString(), out var nota))
+        {
+            return;
+        }
+
+        await AvaliarRh(necessidadeId, nota);
     }
 
     private async Task AvaliarColaborador(int necessidadeId, int nota)
@@ -399,23 +604,63 @@
         if (sucesso)
         {
             var necessidade = ListaNecessidades.FirstOrDefault(n => n.Id == necessidadeId);
-            if (necessidade != null)
+            if (necessidade is not null)
+            {
                 necessidade.NotaSatisfacaoColaborador = nota;
-            await ExibirAlertaSucesso("✅ Avaliação registrada com sucesso!");
+            }
+
+            await ExibirAlertaSucesso("Avaliacao registrada com sucesso.");
         }
     }
 
-    private async Task AvaliarRH(int necessidadeId, int nota)
+    private async Task AvaliarRh(int necessidadeId, int nota)
     {
         var sucesso = await ApiService.AtualizarNotaSatisfacaoRH(necessidadeId, nota);
         if (sucesso)
         {
             var necessidade = ListaNecessidades.FirstOrDefault(n => n.Id == necessidadeId);
-            if (necessidade != null)
+            if (necessidade is not null)
+            {
                 necessidade.NotaSatisfacaoRH = nota;
-            await ExibirAlertaSucesso("✅ Avaliação registrada com sucesso!");
+            }
+
+            await ExibirAlertaSucesso("Avaliacao registrada com sucesso.");
         }
     }
+
+    private static bool NecessidadePermiteEdicao(NecessidadeResponse necessidade) =>
+        necessidade.Status is not "Fechada" and not "Cancelada";
+
+    private static bool NecessidadeCritica(NecessidadeResponse necessidade) =>
+        necessidade.Status == "Aberta" && (necessidade.Prioridade <= 2 || necessidade.Complexidade >= 9);
+
+    private bool AplicarFiltro(NecessidadeResponse necessidade) => FiltroAtivo switch
+    {
+        "Criticas" => NecessidadeCritica(necessidade),
+        "Com alerta" => necessidade.TotalAlertas > 0,
+        "Em tratativa" => necessidade.TotalTarefasAbertas > 0 && necessidade.Status == "Aberta",
+        "Finalizadas" => necessidade.Status == "Fechada",
+        _ => true
+    };
+
+    private void SelecionarFiltro(string filtro)
+    {
+        FiltroAtivo = filtro;
+    }
+
+    private string ObterResponsavelNecessidade(NecessidadeResponse necessidade) =>
+        !string.IsNullOrWhiteSpace(necessidade.ResponsavelAtualNome)
+            ? necessidade.ResponsavelAtualNome
+            : "Nao atribuido";
+
+    private static string ObterPrazoNecessidade(NecessidadeResponse necessidade) =>
+        necessidade.ProximoPrazo.HasValue
+            ? necessidade.ProximoPrazo.Value.ToLocalTime().ToString("dd/MM/yyyy HH:mm")
+            : "Sem prazo ativo";
+
+    private void DefinirMensagemOperacao(string mensagem, string classe)
+    {
+        MensagemOperacao = mensagem;
+        ClasseMensagemOperacao = classe;
+    }
 }
-
-

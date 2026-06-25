@@ -1,29 +1,114 @@
-﻿@page "/login"
+@page "/login"
 @inject API ApiService
 @inject NavigationManager Navigation
-@inject Blazored.LocalStorage.ILocalStorageService LocalStorage
+@inject SessionService SessionService
+@inject NotificationService NotificationService
+
 <div class="login-page">
-    <div class="login-container">
-        <img src="images/logo.png" alt="Logo" class="login-logo" />
-        <h3>Login</h3>
+    <section class="login-showcase">
+        <span class="login-pill">Comunicacao, prioridade e evolucao</span>
+        <h1>A comunicacao entre colaboradores e RH, organizada do inicio ao fim.</h1>
+        <p>Centralize necessidades, tarefas, prioridades e historico em uma experiencia mais clara, rastreavel e pronta para escalar sua operacao.</p>
+
+        <div class="login-showcase__preview">
+            <div class="login-showcase__preview-header">
+                <div>
+                    <span>Ambiente demonstrativo</span>
+                    <strong>Painel de necessidades</strong>
+                </div>
+                <div class="login-showcase__preview-badge">Atualizacao demonstrativa</div>
+            </div>
+
+            <div class="login-showcase__stats">
+                <article>
+                    <strong>42</strong>
+                    <span>Necessidades em andamento</span>
+                </article>
+                <article>
+                    <strong>8</strong>
+                    <span>Prazos proximos</span>
+                </article>
+                <article>
+                    <strong>5</strong>
+                    <span>Alertas recentes</span>
+                </article>
+                <article>
+                    <strong>4,6/5</strong>
+                    <span>Satisfacao apos tratativa</span>
+                </article>
+            </div>
+
+            <div class="login-showcase__list">
+                <article>
+                    <div>
+                        <strong>Ajuste de beneficio</strong>
+                        <span>Beneficios</span>
+                    </div>
+                    <div class="login-status-chip">Em analise</div>
+                </article>
+                <article>
+                    <div>
+                        <strong>Programacao de ferias</strong>
+                        <span>Ferias e licencas</span>
+                    </div>
+                    <div class="login-status-chip login-status-chip--soft">Aguardando retorno</div>
+                </article>
+                <article>
+                    <div>
+                        <strong>Equipamento para trabalho</strong>
+                        <span>Recursos ao trabalho</span>
+                    </div>
+                    <div class="login-status-chip login-status-chip--rose">Em execucao</div>
+                </article>
+            </div>
+        </div>
+
+        <div class="login-showcase__metrics">
+            <article>
+                <strong>Acesso por perfil</strong>
+                <span>Visibilidade conforme o papel de cada usuario.</span>
+            </article>
+            <article>
+                <strong>Historico e indicadores</strong>
+                <span>Leitura executiva e acompanhamento operacional em um so lugar.</span>
+            </article>
+            <article>
+                <strong>Fluxo organizado</strong>
+                <span>Demandas, tratativas e prazos com mais contexto para o RH.</span>
+            </article>
+        </div>
+    </section>
+
+    <section class="login-container">
+        <div class="login-container__header">
+            <img src="/images/logo-prhosa.png" alt="Logo PrHosa" class="login-logo" />
+            <div>
+                <span class="login-pill login-pill--soft">Acesso ao workspace</span>
+                <h3>Entrar na plataforma</h3>
+                <p>Use seu e-mail corporativo para acessar o ambiente interno.</p>
+            </div>
+        </div>
 
         @if (!string.IsNullOrEmpty(Message))
         {
             <div class="alert @alertClass">@Message</div>
         }
 
-        <label>E-mail:</label>
-        <input type="email" class="form-control" @bind="Email" />
+        <div class="login-form">
+            <label for="login-email">E-mail</label>
+            <input id="login-email" type="email" class="form-control" @bind="Email" autocomplete="username" placeholder="voce@empresa.com.br" />
 
-        <label>Senha:</label>
-        <input type="password" class="form-control" @bind="Password" />
+            <label for="login-password">Senha</label>
+            <input id="login-password" type="password" class="form-control" @bind="Password" autocomplete="current-password" placeholder="Digite sua senha" />
 
-        <button class="btn btn-primary" @onclick="FazerLogin">Entrar</button>
+            <button class="btn btn-primary" @onclick="FazerLogin">Entrar no painel</button>
+        </div>
 
-        <p></p>
-        <p><a href="Register" class="forgot-password">Primeiro acesso?</a></p>
-        <p><a href="#" class="forgot-password">Esqueci minha senha</a></p>
-    </div>
+        <div class="login-links">
+            <a href="Register" class="forgot-password">Primeiro acesso?</a>
+            <a href="#" class="forgot-password">Esqueci minha senha</a>
+        </div>
+    </section>
 </div>
 
 @code {
@@ -41,24 +126,43 @@
             return;
         }
 
-        var resultado = await ApiService.PostLogin(Email, Password);
+        try
+        {
+            var resultado = await ApiService.PostLogin(Email, Password);
 
-        if (resultado == "success")
-        {
-            await LocalStorage.SetItemAsync("usuario_email", Email); // 🔹 Salva o e-mail no LocalStorage
-            Message = "Login realizado com sucesso!";
-            alertClass = "alert-success";
-            await Task.Delay(1000);
-            Navigation.NavigateTo("/home"); // 🔹 Redireciona após login
+            if (resultado.Success)
+            {
+                await SessionService.SignInAsync(resultado.Email);
+                Message = "Login realizado com sucesso!";
+                alertClass = "alert-success";
+                NotificationService.Success("Autenticacao realizada com sucesso.");
+                await Task.Delay(1000);
+                Navigation.NavigateTo("/dashboard");
+            }
+            else if (resultado.ErrorCode == "invalid_credentials")
+            {
+                Message = "Identificador ou senha invalidos!";
+                alertClass = "alert-danger";
+            }
+            else if (resultado.ErrorCode == "network_error")
+            {
+                Message = "Nao foi possivel conectar com a API. Verifique a publicacao ou a politica de CORS.";
+                alertClass = "alert-warning";
+            }
+            else if (resultado.ErrorCode == "identifier_not_resolved")
+            {
+                Message = "O acesso foi validado, mas nao encontramos um e-mail vinculado para abrir a sessao.";
+                alertClass = "alert-warning";
+            }
+            else
+            {
+                Message = string.IsNullOrWhiteSpace(resultado.Message) ? "Erro ao realizar login!" : resultado.Message;
+                alertClass = "alert-danger";
+            }
         }
-        else if (resultado == "invalid_credentials")
+        catch (Exception)
         {
-            Message = "E-mail ou senha inválidos!";
-            alertClass = "alert-danger";
-        }
-        else
-        {
-            Message = "Erro ao realizar login!";
+            Message = "O login falhou por um erro inesperado. Tente novamente em instantes.";
             alertClass = "alert-danger";
         }
     }

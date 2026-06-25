@@ -1,0 +1,160 @@
+@inject NavigationManager Navigation
+@inject SessionService SessionService
+
+<div class="app-shell @(menuCollapsed ? "is-collapsed" : string.Empty) @(mobileMenuOpen ? "is-mobile-open" : string.Empty)">
+    <aside class="app-shell__sidebar">
+        <div class="app-shell__brand">
+            <div class="app-shell__brand-card">
+                <div class="app-shell__brand-lockup">
+                    <img src="/images/logo-prhosa.png" alt="Logo PrHosa" class="app-shell__brand-logo" />
+                </div>
+
+                <div class="app-shell__brand-content">
+                    <div class="app-shell__brand-copy">
+                        <span class="app-shell__eyebrow">Plataforma</span>
+                        <p>Comunicacao que aproxima. Gestao que evolui.</p>
+                    </div>
+
+                    <div class="app-shell__brand-signal">
+                        <span>Leitura premium</span>
+                        <strong>Fluxo claro para pessoas, prioridades e operacao.</strong>
+                    </div>
+                </div>
+            </div>
+
+            <button type="button" class="app-shell__icon-button app-shell__icon-button--ghost" @onclick="CloseMobileMenu" aria-label="Fechar menu">
+                <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+            </button>
+        </div>
+
+        <nav class="app-shell__nav" aria-label="Principal">
+            <span class="app-shell__nav-label">Fluxos principais</span>
+
+            @foreach (var item in navItems)
+            {
+                <button type="button"
+                        class="app-shell__nav-item @(IsActive(item.Href) ? "is-active" : string.Empty)"
+                        @onclick="() => NavigateTo(item.Href)">
+                    <span class="app-shell__nav-icon" aria-hidden="true">
+                        <i class="@item.IconClass"></i>
+                    </span>
+                    <span class="app-shell__nav-copy">
+                        <strong>@item.Label</strong>
+                        <small>@item.Description</small>
+                    </span>
+                </button>
+            }
+        </nav>
+
+        <div class="app-shell__sidebar-note">
+            <span class="app-shell__sidebar-note-label">Workspace interno</span>
+            <strong>Operacao alinhada com a nova marca</strong>
+            <p>Acompanhe demandas, organizacao e historico com uma experiencia mais clara e comercialmente madura.</p>
+        </div>
+
+        <button type="button" class="app-shell__logout" @onclick="LogoutAsync">
+            <i class="fa-solid fa-arrow-right-from-bracket" aria-hidden="true"></i>
+            <span>Sair</span>
+        </button>
+    </aside>
+
+    <div class="app-shell__main">
+        <header class="app-shell__header">
+            <div class="app-shell__header-surface">
+                <div class="app-shell__header-main">
+                    <button type="button" class="app-shell__icon-button app-shell__icon-button--desktop" @onclick="ToggleDesktopMenu" aria-label="Recolher menu">
+                        <i class="fa-solid @(menuCollapsed ? "fa-chevron-right" : "fa-chevron-left")" aria-hidden="true"></i>
+                    </button>
+
+                    <button type="button" class="app-shell__icon-button app-shell__icon-button--mobile" @onclick="OpenMobileMenu" aria-label="Abrir menu">
+                        <i class="fa-solid fa-bars-staggered" aria-hidden="true"></i>
+                    </button>
+
+                    <div class="app-shell__header-copy">
+                        <span class="app-shell__eyebrow">Painel</span>
+                        <h1>@Title</h1>
+                        @if (!string.IsNullOrWhiteSpace(Subtitle))
+                        {
+                            <p>@Subtitle</p>
+                        }
+                    </div>
+
+                    <div class="app-shell__header-badge">
+                        <span>Ambiente operacional</span>
+                        <strong>Padrao pRHosa</strong>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <main class="app-shell__content">
+            @ChildContent
+        </main>
+    </div>
+
+    <button type="button"
+            class="app-shell__overlay @(mobileMenuOpen ? "is-open" : string.Empty)"
+            @onclick="CloseMobileMenu"
+            aria-label="Fechar menu lateral">
+    </button>
+</div>
+
+@code {
+    private readonly AppShellNavItem[] navItems =
+    [
+        new("Dashboard", "/dashboard", "Leitura executiva", "fa-solid fa-chart-line"),
+        new("Visao Geral", "/home", "Conta e cadastros", "fa-solid fa-layer-group"),
+        new("Necessidades", "/Necessidades", "Demandas em andamento", "fa-solid fa-inbox"),
+        new("Tarefas", "/Tarefas", "Fluxo operacional", "fa-solid fa-list-check"),
+        new("Empresas", "/CadastroEmpresa", "Estrutura do cliente", "fa-solid fa-building")
+    ];
+
+    private bool menuCollapsed;
+    private bool mobileMenuOpen;
+
+    [Parameter]
+    public string Title { get; set; } = string.Empty;
+
+    [Parameter]
+    public string? Subtitle { get; set; }
+
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    private void ToggleDesktopMenu()
+    {
+        menuCollapsed = !menuCollapsed;
+    }
+
+    private void OpenMobileMenu()
+    {
+        mobileMenuOpen = true;
+    }
+
+    private void CloseMobileMenu()
+    {
+        mobileMenuOpen = false;
+    }
+
+    private void NavigateTo(string href)
+    {
+        mobileMenuOpen = false;
+        Navigation.NavigateTo(href);
+    }
+
+    private bool IsActive(string href)
+    {
+        var currentPath = new Uri(Navigation.Uri).AbsolutePath.TrimEnd('/').ToLowerInvariant();
+        var targetPath = href.TrimEnd('/').ToLowerInvariant();
+
+        return currentPath == targetPath;
+    }
+
+    private async Task LogoutAsync()
+    {
+        await SessionService.SignOutAsync();
+        Navigation.NavigateTo("/login", true);
+    }
+
+    private sealed record AppShellNavItem(string Label, string Href, string Description, string IconClass);
+}
